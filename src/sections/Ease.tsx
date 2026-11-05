@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { runTool } from "../lib/actions";
+import { copyText } from "../lib/clipboard";
 import { useBusy } from "../lib/busy";
 import { useSelection } from "../lib/selection";
 import { setPrefs, usePrefs } from "../lib/store";
@@ -67,7 +68,7 @@ export function EaseSection() {
               <div className="stage curve-stage"><CurveEditor curve={curve} onChange={setCurve} /></div>
               <div className="code-row">
                 <code>cubic-bezier({curve.map(r2).join(", ")})</code>
-                <button className="pill" onClick={() => navigator.clipboard?.writeText(`cubic-bezier(${curve.map(r2).join(", ")})`)}>Копировать</button>
+                <button className="pill" onClick={() => copyText(`cubic-bezier(${curve.map(r2).join(", ")})`)}>Копировать</button>
               </div>
             </>
           ) : (

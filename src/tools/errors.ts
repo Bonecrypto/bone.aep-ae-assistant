@@ -8,6 +8,7 @@ const messages: Record<string, string> = {
   NO_KEY_PAIRS: "Выделите минимум два соседних ключа на одном свойстве.",
   NO_TARGET_PROPS: "Выделите свойство в таймлайне (например, Position с ключами) и повторите.",
   NO_EXPRESSIONS: "На выделенном нет выражений.",
+  SEPARATED_DIMENSIONS: "У позиции разделены измерения (Separate Dimensions). Объедините их: правый клик по Position → Separate Dimensions.",
   EFFECT_UNAVAILABLE: "Этот эффект нельзя добавить к выделенным слоям.",
   NO_TEXT_LAYER: "Выделите текстовый слой.",
   NO_STYLE: "Сначала скопируйте стиль с текстового слоя.",

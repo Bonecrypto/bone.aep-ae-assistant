@@ -72,3 +72,6 @@ export const clearExpression = hostTool<Record<string, never>>({
   done: (r) => `Выражения убраны: ${Number(r.changed)}.${undoHint}`,
 });
 
+
+// Код, который написала модель, всегда показывается и подтверждается пользователем.
+customExpression.alwaysConfirm = true;

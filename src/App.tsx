@@ -12,6 +12,7 @@ import { EaseSection } from "./sections/Ease";
 import { SettingsSection } from "./sections/Settings";
 import { Browser } from "./ui/Browser";
 import { Palette } from "./ui/Palette";
+import { BrandMark } from "./ui/Brand";
 import { IconBraces, IconChat, IconCurve, IconGear, IconLayers, IconPlus, IconSearch, IconSparkles, IconText, IconWave, IconWrench } from "./ui/icons";
 
 const TABS = [
@@ -64,6 +65,9 @@ export function App() {
     root.style.setProperty("--accent-glow", `rgba(${r},${g},${b},.4)`);
     root.style.setProperty("--accent-light", mix(0.35, 255));
     root.style.setProperty("--accent-text", theme === "light" ? mix(0.25, 0) : mix(0.55, 255));
+    // текст на акцентном фоне: тёмный для светлых акцентов (Soft Lilac), иначе белый
+    const lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+    root.style.setProperty("--on-accent", lum > 0.62 ? "#11001c" : "#ffffff");
     root.dataset.theme = theme;
   }, [accent, theme]);
 
@@ -77,6 +81,7 @@ export function App() {
   return (
     <div className="app">
       <header className="topbar">
+        <button className="brand-btn" title="bone.aep — оформление и настройки" onClick={() => goTo("settings")}><BrandMark /></button>
         <nav className="tabs" role="tablist">
           {TABS.map((t) => (
             <button key={t.id} role="tab" aria-selected={t.id === current?.id} className={`tab${t.id === current?.id ? " active" : ""}`} title={t.title} onClick={() => goTo(t.id)}>
@@ -101,7 +106,7 @@ export function App() {
       <footer className={`statusbar status-${recent ? status.kind : sel.connected || !inAE() ? "ok" : "error"}`} title={recent ? status.text : info}>
         <span className="status-dot" />
         <span className="status-text">{recent ? status.text : `${sel.connected ? "Подключено" : inAE() ? "Нет связи с AE" : "Демо"} · ${info}`}</span>
-        <span className="status-ver">AE Assistant {VERSION}{BUILD ? ` · ${BUILD}` : ""}</span>
+        <span className="status-ver">bone.aep · AE Assistant {VERSION}{BUILD ? ` · ${BUILD}` : ""}</span>
       </footer>
 
       {palette && <Palette commands={commands} onClose={() => setPalette(false)} />}

@@ -38,7 +38,7 @@ export function ChatSection({ onOpenSettings }: { onOpenSettings: () => void }) 
     let args: Record<string, unknown> = {};
     try { args = rawArgs ? JSON.parse(rawArgs) : {}; } catch { return JSON.stringify({ ok: false, error: "Аргументы не JSON" }); }
 
-    const card: ToolCard = { id, tool, args, state: tool.mutates && getPrefs().chatConfirm ? "ask" : "running" };
+    const card: ToolCard = { id, tool, args, state: tool.mutates && (getPrefs().chatConfirm || tool.alwaysConfirm) ? "ask" : "running" };
     if (card.state === "ask") {
       const ok = await ask(card);
       if (!ok) { updateCard(id, { state: "rejected" }); return JSON.stringify({ ok: false, error: "Пользователь отменил действие" }); }

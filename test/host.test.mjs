@@ -291,3 +291,9 @@ test("ae.selectionInfo", () => {
   const r = h.run("ae.selectionInfo", {});
   assert.equal(r.comp, "Comp 1"); assert.equal(r.selected, 2); assert.equal(r.text, 1);
 });
+
+test("тряска на позиции с раздельными измерениями — понятная ошибка", () => {
+  const { run, tr } = one();
+  tr.property("ADBE Position").dimensionsSeparated = true;
+  assert.equal(run("ae.expressions", { items: [{ path: ["ADBE Transform Group", "ADBE Position"], code: "x" }], controls: [] }).code, "SEPARATED_DIMENSIONS");
+});

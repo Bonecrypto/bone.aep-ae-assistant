@@ -19,5 +19,3 @@ export const tools: Tool<any>[] = [
   textCopyStyle, textPasteStyle,
   precompose, sequence, labelByType, removeUnused,
 ];
-
-export const getTool = (name: string) => tools.find((t) => t.name === name);

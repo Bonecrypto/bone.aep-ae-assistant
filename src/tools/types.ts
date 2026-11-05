@@ -20,6 +20,8 @@ export interface Tool<I = Record<string, unknown>> {
   description: string;
   inputSchema: InputSchema;
   mutates: boolean;
+  /** Всегда спрашивать перед выполнением из чата, даже если подтверждения выключены (код от модели). */
+  alwaysConfirm?: boolean;
   /** Человеческое описание конкретного вызова — для подтверждения в чате. */
   describe?: (input: I) => string;
   run: (input: I) => Promise<ToolResult>;

@@ -3,6 +3,7 @@ import { useSelection } from "../lib/selection";
 import { setPrefs, usePrefs } from "../lib/store";
 import { useBusy } from "../lib/busy";
 import { runTool } from "../lib/actions";
+import { copyText } from "../lib/clipboard";
 import { defaults, type Preset, type Values } from "../presets/types";
 import { Controls } from "./Controls";
 import { Preview } from "./Preview";
@@ -65,7 +66,7 @@ export function Browser({ id, title, presets, footerHint }: { id: string; title:
   const [open, setOpen] = useState(false);
   const [showCode, setShowCode] = useState(false);
   const preset = presets.find((p) => p.id === cur) ?? presets[0];
-  const v = values[preset.id] ?? defaults(preset);
+  const v = useMemo(() => values[preset.id] ?? defaults(preset), [values, preset]);
   const spec = useMemo(() => preset.preview?.(v), [preset, v]);
   const pick = (pid: string) => { setCur(pid); setOpen(false); setReplay((r) => r + 1); setPrefs({ lastPreset: { ...lastPreset, [id]: pid } }); };
 
@@ -94,7 +95,7 @@ export function Browser({ id, title, presets, footerHint }: { id: string; title:
           {preset.code && showCode && (
             <div className="code-wrap">
               <pre className="code">{preset.code(v)}</pre>
-              <button className="pill code-copy" onClick={() => navigator.clipboard?.writeText(preset.code!(v))}>Копировать</button>
+              <button className="pill code-copy" onClick={() => copyText(preset.code!(v))}>Копировать</button>
             </div>
           )}
           <Controls controls={preset.controls} values={v} onChange={(nv) => setValues({ ...values, [preset.id]: nv })} />

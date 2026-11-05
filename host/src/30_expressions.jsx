@@ -122,7 +122,7 @@
     if (!comp) return fail("NO_COMP");
     var layers = selectedLayers(comp);
     if (!layers.length) return fail("NO_SELECTION");
-    var changed = 0, errors = [];
+    var changed = 0, errors = [], separated = 0;
     undoable(args.undoName, function () {
       for (var i = 0; i < layers.length; i++) {
         var layer = layers[i];
@@ -138,7 +138,7 @@
         for (var k = 0; k < args.items.length; k++) {
           var p = propByPath(layer, args.items[k].path);
           if (!p || !p.canSetExpression) continue;
-          if (p.dimensionsSeparated) continue;
+          if (p.dimensionsSeparated) { separated++; continue; }
           p.expression = args.items[k].code.split("@@").join(tag);
           p.expressionEnabled = true;
           if (p.expressionError) errors.push(p.expressionError);
@@ -147,6 +147,7 @@
         if (did) changed++;
       }
     });
+    if (!changed && separated) return fail("SEPARATED_DIMENSIONS");
     if (!changed) return fail("NOTHING_CHANGED", { skipped: { other: layers.length } });
-    return { ok: true, changed: changed, expressionError: errors.length ? errors[0] : "" };
+    return { ok: true, changed: changed, separated: separated, expressionError: errors.length ? errors[0] : "" };
   };

@@ -100,8 +100,13 @@ export async function installRelease(r: Release, onStep: (s: string) => void) {
   onStep("Устанавливаю…");
   const dest = extensionDir(req);
   if (!fs.existsSync(path.join(dest, "CSXS", "manifest.xml"))) throw new Error(`Не нашёл папку панели: ${dest}`);
-  fs.rmSync(path.join(dest, "client"), { recursive: true, force: true }); // старые бандлы с другими именами
+  // Сначала копируем новое поверх (старые файлы не трогаем, пока всё не скопировано),
+  // потом убираем устаревшие бандлы, которых нет в новой версии.
   copyDir(req, src, dest);
+  const newAssets = new Set<string>(fs.readdirSync(path.join(src, "client", "assets")));
+  for (const f of fs.readdirSync(path.join(dest, "client", "assets"))) {
+    if (!newAssets.has(f)) { try { fs.rmSync(path.join(dest, "client", "assets", f)); } catch { /* не критично */ } }
+  }
   fs.rmSync(tmp, { recursive: true, force: true });
 
   onStep("Перезапускаю панель…");
