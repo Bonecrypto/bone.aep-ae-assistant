@@ -8,6 +8,9 @@
 Поэтому панель — CEP (React + TypeScript + Vite), действия — ExtendScript (`host/*.jsx`).
 Переход на UXP — когда Adobe выпустит панели для AE в стабильной версии.
 
+## Установка
+Для пользователей — [INSTALL.md](INSTALL.md): скачать архив, запустить `install.cmd`.
+
 ## Установка для разработки (Windows)
 Нужны Node.js 20+ и After Effects 2022 (22.0) или новее.
 
@@ -36,6 +39,7 @@ npm run install:dev
 | `npm run build` | проверка типов + проверка host-скриптов + сборка в `dist/com.aeassistant.panel` |
 | `npm test` | прогон `host/*.jsx` на имитации объектов AE |
 | `npm run install:dev` | установка сборки в папку расширений CEP |
+| `npm run package` | архив для релиза `dist/release/AE-Assistant-<версия>-win.zip` |
 
 ## Структура
 ```

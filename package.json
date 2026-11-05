@@ -10,7 +10,8 @@
     "check:host": "node scripts/check-host.mjs",
     "build": "tsc --noEmit && node scripts/check-host.mjs && vite build && node scripts/assemble.mjs",
     "install:dev": "node scripts/install-dev.mjs",
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test test/*.test.mjs",
+    "package": "npm run build && node scripts/package.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",
