@@ -6,5 +6,5 @@ export const VERSION = __APP_VERSION__;
 export const BUILD = Number(__BUILD__) || 0;
 
 /** Репозиторий, где лежат релизы для автообновления. */
-export const REPO = "dukost42-byte/ae-assistant";
+export const REPO = "Bonecrypto/bone.aep-ae-assistant";
 export const REPO_URL = `https://github.com/${REPO}`;
