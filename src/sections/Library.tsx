@@ -18,7 +18,8 @@ export function LibrarySection() {
   const { libraryFolders, favorites } = usePrefs();
   const busy = useBusy();
   const sel = useSelection();
-  const wide = useWide(520);
+  const wide = useWide(440);
+  const [catOpen, setCatOpen] = useState(false);
   const [cat, setCat] = useState(ALL);
   const [q, setQ] = useState("");
   const [cur, setCur] = useState<string | null>(null);
@@ -58,18 +59,20 @@ export function LibrarySection() {
   if (libraryFolders.length === 0 && libraryAvailable()) return <Empty onPick={pick} />;
 
   const tree = buildTree(lib.items);
+  const pickCat = (c: string) => { setCat(c); setCatOpen(false); };
+  const catTitle = (c: string) => (c === ALL ? "Всё" : c === NEW ? "Новое" : c === FAV ? "Избранное" : c.split(" / ").pop()!);
   const special = (
     <>
-      <button className={`cat${cat === ALL ? " on" : ""}`} onClick={() => setCat(ALL)}><span>Всё</span><em>{lib.items.length}</em></button>
-      {newItems.length > 0 && <button className={`cat${cat === NEW ? " on" : ""}`} onClick={() => setCat(NEW)}><span>Новое</span><em>{newItems.length}</em></button>}
-      {favorites.some((f) => f.startsWith("lib:")) && <button className={`cat${cat === FAV ? " on" : ""}`} onClick={() => setCat(FAV)}><span>Избранное</span><em>{lib.items.filter(fav).length}</em></button>}
+      <button className={`cat${cat === ALL ? " on" : ""}`} onClick={() => pickCat(ALL)}><span>Всё</span><em>{lib.items.length}</em></button>
+      {newItems.length > 0 && <button className={`cat${cat === NEW ? " on" : ""}`} onClick={() => pickCat(NEW)}><span>Новое</span><em>{newItems.length}</em></button>}
+      {favorites.some((f) => f.startsWith("lib:")) && <button className={`cat${cat === FAV ? " on" : ""}`} onClick={() => pickCat(FAV)}><span>Избранное</span><em>{lib.items.filter(fav).length}</em></button>}
     </>
   );
   const categories = (
     <>
       {special}
       <div className="cat-sep" />
-      <Tree nodes={tree} current={cat} onPick={setCat} />
+      <Tree nodes={tree} current={cat} onPick={pickCat} />
     </>
   );
 
@@ -92,13 +95,15 @@ export function LibrarySection() {
           {newItems.length > 0 && <button className="pill" onClick={() => markSeen(newItems)} title="Снять отметки «Новое»">Просмотрено</button>}
         </header>
         {!wide && (
-          <div className="cat-select">
-            <select value={cat} onChange={(e) => setCat(e.target.value)}>
-              <option value={ALL}>Всё ({lib.items.length})</option>
-              {newItems.length > 0 && <option value={NEW}>Новое ({newItems.length})</option>}
-              {favorites.some((f) => f.startsWith("lib:")) && <option value={FAV}>Избранное</option>}
-              {flatten(tree).map(({ node, depth }) => <option key={node.path} value={node.path}>{"\u00a0\u00a0".repeat(depth)}{node.name} ({node.count})</option>)}
-            </select>
+          <div className="cat-picker">
+            <button className="picker" onClick={() => setCatOpen(!catOpen)}>
+              <span><b>{catTitle(cat)}</b><small>{shown.length} {plural(shown.length, "элемент", "элемента", "элементов")}</small></span><i>▾</i>
+            </button>
+            {catOpen && (
+              <div className="cat-pop" onMouseLeave={() => setCatOpen(false)}>
+                <div className="sidebar-list cats">{categories}</div>
+              </div>
+            )}
           </div>
         )}
         {showFolders && (
@@ -211,7 +216,6 @@ function buildTree(items: LibItem[]): Node[] {
   return roots;
 }
 
-const flatten = (ns: Node[], depth = 0): { node: Node; depth: number }[] => ns.flatMap((n) => [{ node: n, depth }, ...flatten(n.children, depth + 1)]);
 
 function Tree({ nodes, current, onPick, depth = 0 }: { nodes: Node[]; current: string; onPick: (p: string) => void; depth?: number }) {
   const [open, setOpen] = useState<Record<string, boolean>>({});
