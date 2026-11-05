@@ -15,6 +15,7 @@ import { useLibrary } from "./lib/library";
 import { SettingsSection } from "./sections/Settings";
 import { Browser } from "./ui/Browser";
 import { Palette } from "./ui/Palette";
+import { Dock } from "./ui/Dock";
 import { IconFolder, IconBraces, IconChat, IconCurve, IconGear, IconLayers, IconPlus, IconSearch, IconSparkles, IconText, IconWave, IconWrench } from "./ui/icons";
 
 const TABS = [
@@ -31,7 +32,7 @@ const TABS = [
 ] as const;
 
 export function App() {
-  const { tab, accent, theme } = usePrefs();
+  const { tab, accent, theme, dock } = usePrefs();
   const status = useStatus();
   const sel = useSelection();
   const [palette, setPalette] = useState(false);
@@ -101,6 +102,8 @@ export function App() {
         </div>
       </header>
 
+      <div className="body">
+      {dock && <Dock />}
       <main className="main">
         {tab === "settings" && <SettingsSection />}
         {current?.id === "ease" && <EaseSection />}
@@ -108,6 +111,7 @@ export function App() {
         {current?.id === "chat" && <ChatSection onOpenSettings={() => goTo("settings")} />}
         {browser && <Browser key={current!.id} id={current!.id} title={browser.title} presets={browser.presets} />}
       </main>
+      </div>
 
       <footer className={`statusbar status-${recent ? status.kind : sel.connected || !inAE() ? "ok" : "error"}`} title={recent ? status.text : info}>
         <span className="status-dot" />

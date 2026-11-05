@@ -27,6 +27,9 @@ export type Prefs = {
   libraryFolders: string[];
   librarySeen: Record<string, number>;
   libraryKnownRoots: string[];
+  usage: Record<string, { n: number; last: number }>;
+  lastValues: Record<string, Record<string, any>>;
+  dock: boolean;
 };
 
 const defaults: Prefs = {
@@ -53,6 +56,9 @@ const defaults: Prefs = {
   libraryFolders: [],
   librarySeen: {},
   libraryKnownRoots: [],
+  usage: {},
+  lastValues: {},
+  dock: true,
 };
 
 const KEY = "aea.prefs.v1";

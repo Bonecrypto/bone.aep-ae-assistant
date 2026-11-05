@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { runTool } from "../lib/actions";
 import { copyText } from "../lib/clipboard";
+import { recordUse } from "../lib/usage";
 import { useBusy } from "../lib/busy";
 import { useSelection } from "../lib/selection";
 import { setPrefs, usePrefs } from "../lib/store";
@@ -83,7 +84,7 @@ export function EaseSection() {
         </div>
         <footer className="detail-foot">
           <span>{sel.keys ? `Выделено ключей: ${sel.keys}` : "Выделите минимум два соседних ключа"}</span>
-          <button className="btn primary" disabled={busy} onClick={() => runTool(ease, mode === "curve" ? { curve } : { manual })}>Применить</button>
+          <button className="btn primary" disabled={busy} onClick={() => { if (mode === "curve" && !edited) recordUse(`ease:${cur}`); runTool(ease, mode === "curve" ? { curve } : { manual }); }}>Применить</button>
         </footer>
       </section>
     </div>

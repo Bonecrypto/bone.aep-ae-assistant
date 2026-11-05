@@ -56,6 +56,10 @@ export function SettingsSection() {
           {ACCENTS.map((c) => <button key={c} className={`swatch${p.accent === c ? " on" : ""}`} style={{ background: c }} title={c} onClick={() => setPrefs({ accent: c })} />)}
         </div>
         <Seg value={p.theme} onChange={(v) => setPrefs({ theme: v })} options={[{ value: "dark", label: "Тёмная" }, { value: "light", label: "Светлая" }]} />
+        <label className="toggle" title="Колонка слева: избранное (звёздочки) и частые действия">
+          <input type="checkbox" checked={p.dock} onChange={(e) => setPrefs({ dock: e.target.checked })} />
+          <span className="switch" /> Панель быстрого доступа слева
+        </label>
       </div>
       <div className="panel">
         <div className="panel-title">ИИ-модель для чата</div>

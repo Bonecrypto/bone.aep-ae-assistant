@@ -7,6 +7,7 @@ import { setPrefs, setStatus, usePrefs } from "../lib/store";
 import { plural } from "../lib/format";
 import { libImport, pickFolder, reveal } from "../tools/ae/library";
 import { useWide } from "../ui/Browser";
+import { recordUse } from "../lib/usage";
 import { MediaPreview } from "../ui/Preview";
 import { IconSearch, IconStar } from "../ui/icons";
 
@@ -51,6 +52,7 @@ export function LibrarySection() {
     if (path) { addFolder(path); setStatus({ kind: "ok", text: `Библиотека: ${path}` }); }
   };
   const apply = async (it: LibItem) => {
+    recordUse(`lib:${it.path}`);
     const r = await runTool(libImport, { item: it });
     if (r?.ok) markSeen([it]);
   };

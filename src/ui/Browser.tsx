@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSelection } from "../lib/selection";
-import { setPrefs, usePrefs } from "../lib/store";
+import { getPrefs, setPrefs, usePrefs } from "../lib/store";
 import { useBusy } from "../lib/busy";
 import { runTool } from "../lib/actions";
 import { copyText } from "../lib/clipboard";
+import { recordUse } from "../lib/usage";
 import { defaults, type Preset, type Values } from "../presets/types";
 import { Controls } from "./Controls";
 import { Preview } from "./Preview";
@@ -66,7 +67,7 @@ export function Browser({ id, title, presets, footerHint }: { id: string; title:
   const [open, setOpen] = useState(false);
   const [showCode, setShowCode] = useState(false);
   const preset = presets.find((p) => p.id === cur) ?? presets[0];
-  const v = useMemo(() => values[preset.id] ?? defaults(preset), [values, preset]);
+  const v = useMemo(() => values[preset.id] ?? { ...defaults(preset), ...(getPrefs().lastValues[`${id}:${preset.id}`] ?? {}) }, [values, preset, id]);
   const spec = useMemo(() => preset.preview?.(v), [preset, v]);
   const pick = (pid: string) => { setCur(pid); setOpen(false); setReplay((r) => r + 1); setPrefs({ lastPreset: { ...lastPreset, [id]: pid } }); };
 
@@ -102,7 +103,7 @@ export function Browser({ id, title, presets, footerHint }: { id: string; title:
         </div>
         <footer className="detail-foot">
           <span>{preset.hint ? preset.hint(v, sel) : footerHint}</span>
-          <button className="btn primary" disabled={busy} onClick={() => applyPreset(preset, v)}>{preset.applyLabel ?? "Применить"}</button>
+          <button className="btn primary" disabled={busy} onClick={() => { recordUse(`${id}:${preset.id}`, v); applyPreset(preset, v); }}>{preset.applyLabel ?? "Применить"}</button>
         </footer>
       </section>
     </div>

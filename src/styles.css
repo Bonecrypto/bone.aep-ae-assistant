@@ -56,7 +56,21 @@ h2 { font-size: 15px; font-weight: 650; letter-spacing: -.01em; }
 .round:hover, .round.on { color: var(--text); }
 .update-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
 
-.main { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.body { flex: 1; min-height: 0; display: flex; }
+.main { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+
+/* ---------- быстрый доступ ---------- */
+.dock { width: 44px; flex: none; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 0; border-right: 1px solid var(--line); background: var(--side); overflow-y: auto; scrollbar-width: none; }
+.dock::-webkit-scrollbar { display: none; }
+.dock-btn { width: 34px; height: 34px; flex: none; border-radius: 10px; display: grid; place-items: center; color: var(--text); background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); transition: background .12s, transform .08s, color .12s; }
+.dock-btn:hover:not(:disabled) { background: var(--accent); color: var(--on-accent); }
+.dock-btn:active:not(:disabled) { transform: scale(.94); }
+.dock-glyph { position: relative; display: grid; place-items: center; width: 100%; height: 100%; }
+.dock-glyph svg { width: 13px; height: 13px; position: absolute; top: 4px; left: 4px; opacity: .55; }
+.dock-glyph b { font-size: 11px; font-weight: 700; margin-top: 7px; margin-left: 5px; letter-spacing: -.02em; }
+.dock-sep { width: 20px; height: 1px; background: var(--line); margin: 4px 0; flex: none; }
+.dock-empty { margin-top: 4px; color: var(--muted); opacity: .6; }
+.dock-empty svg { width: 15px; height: 15px; }
 
 /* ---------- браузер пресетов ---------- */
 .browser { flex: 1; min-height: 0; display: flex; }
