@@ -224,3 +224,13 @@ test("выражение-цикл без выделенного свойства
   const { run } = one();
   assert.equal(run("ae.expression", { code: 'loopOut("cycle")' }).code, "NO_TARGET_PROPS");
 });
+
+test("отскок: вход в ключи становится линейным (кроме первого), выход не трогаем", () => {
+  const { run, tr, l } = one();
+  const p = tr.property("ADBE Position");
+  p.setValueAtTime(0, [0, 0]); p.setValueAtTime(1, [100, 0]); p.setValueAtTime(2, [100, 0]);
+  p.keys.forEach((k) => { k.inI = 6613; k.outI = 6613; });
+  l.selectedProperties = [p];
+  run("ae.expression", { code: "x", linearIn: true });
+  assert.deepEqual(p.keys.map((k) => [k.inI, k.outI]), [[6613, 6613], [6612, 6613], [6612, 6613]]);
+});

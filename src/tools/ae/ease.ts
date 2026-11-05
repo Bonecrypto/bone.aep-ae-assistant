@@ -1,3 +1,4 @@
+import { plural } from "../../lib/format";
 import { EASE_PRESETS, type Curve } from "../../presets/ease";
 import { hostTool, undoHint } from "../host-tool";
 
@@ -26,7 +27,7 @@ export const ease = hostTool<EaseInput>({
   },
   mutates: true,
   toArgs: (i) => (i.manual ? { manual: i.manual } : { curve: curveOf(i) }),
-  done: (r) => `График применён: ${Number(r.changed)} ${Number(r.changed) === 1 ? "отрезок" : "отрезков"}.${undoHint}`,
+  done: (r) => `График применён: ${Number(r.changed)} ${plural(Number(r.changed), "отрезок", "отрезка", "отрезков")}.${undoHint}`,
 });
 
 export const readEase = hostTool<Record<string, never>>({

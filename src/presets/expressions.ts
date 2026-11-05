@@ -10,6 +10,8 @@ export type ExprPreset = {
   defaultPath?: string[];
   forceDefault?: boolean;
   lookAtLast?: boolean;
+  /** Работает от скорости прилёта в ключ — предлагать сделать вход в ключи линейным. */
+  linearIn?: boolean;
   /** Имена эффектов-ползунков на слое (видны пользователю). */
   controlName: (p: ExprParam) => string;
   code: (name: (key: string) => string) => string;
@@ -25,16 +27,42 @@ const fx = (name: string) => `effect(${JSON.stringify(name)})(1)`;
 // Безопасная векторная математика для 1D и nD свойств.
 const VEC = "function A(a,b){return (a instanceof Array)?add(a,b):a+b}function S(a,b){return (a instanceof Array)?sub(a,b):a-b}function M(a,k){return (a instanceof Array)?mul(a,k):a*k}";
 
-const afterKey = (amp: string, freq: string, decay: string, bounce: boolean) => `${VEC}
-var amp = ${amp} / 100, freq = ${freq}, decay = ${decay};
-var n = 0;
+/*
+ * Выражения «после ключа». Срабатывают только на ключах, где движение останавливается
+ * (последний ключ или после него стоп), и берут скорость, с которой слой прилетел в ключ.
+ * Если вход в ключ с Easy Ease — скорость 0 и эффекта нет, поэтому панель умеет сделать вход линейным.
+ */
+const onStop = (body: string) => `${VEC}
+function L(a){return (a instanceof Array)?length(a):Math.abs(a)}
+var res = value, n = 0;
 if (numKeys > 0) { n = nearestKey(time).index; if (key(n).time > time) n--; }
 if (n > 0 && time > key(n).time) {
-  var t = time - key(n).time;
-  var v = velocityAtTime(key(n).time - thisComp.frameDuration / 10);
-  var w = ${bounce ? "Math.abs(Math.sin(freq * t * 2 * Math.PI))" : "Math.sin(freq * t * 2 * Math.PI)"};
-  ${bounce ? "S" : "A"}(value, M(v, amp * w / Math.exp(decay * t)));
-} else { value; }`;
+  var f = thisComp.frameDuration / 10;
+  var v = velocityAtTime(key(n).time - f);
+  var stops = L(velocityAtTime(key(n).time + f)) <= L(v) * 0.01;
+  if (stops && L(v) > 0) {
+    var t = time - key(n).time;
+${body}
+  }
+}
+res;`;
+
+/** Затухающее покачивание вокруг ключа (перелёт и возврат). */
+const inertiaBody = (amp: string, freq: string, decay: string) =>
+  `    res = A(value, M(v, ${amp} / 100 * Math.sin(${freq} * t * 2 * Math.PI) / Math.exp(${decay} * t)));`;
+
+/** Упругий отскок: всегда назад от ключа, затухает по экспоненте. */
+const elasticBody = (amp: string, freq: string, decay: string) =>
+  `    res = S(value, M(v, ${amp} / 100 * Math.abs(Math.sin(${freq} * t * 2 * Math.PI)) / Math.exp(${decay} * t)));`;
+
+/** Мяч: настоящие параболы. Каждый отскок теряет скорость на (1 - упругость). */
+const ballBody = (elastic: string, gravity: string, count: string) => `    var e = clamp(${elastic} / 100, 0, 0.95), g = Math.max(1, ${gravity}), nMax = Math.round(${count});
+    var u = M(v, 1 / L(v)), s = L(v) * e;
+    for (var b = 0; b < nMax; b++) {
+      var d = 2 * s / g;
+      if (t < d) { res = S(value, M(u, s * t - g * t * t / 2)); break; }
+      t -= d; s *= e;
+    }`;
 
 export const EXPR_PRESETS: ExprPreset[] = [
   {
@@ -62,24 +90,34 @@ export const EXPR_PRESETS: ExprPreset[] = [
     params: [], controlName: ctl("Повтор"), code: () => 'loopOut("offset")',
   },
   {
-    id: "inertia", title: "Инерция", hint: "Покачивание после каждого ключа",
+    id: "inertia", title: "Инерция", hint: "Перелёт и затухающее покачивание в ключе остановки",
     params: [
       { key: "amp", label: "Сила", value: 5, min: 0, max: 50, step: 0.5 },
       { key: "freq", label: "Частота", value: 2.5, min: 0.1, max: 10, step: 0.1 },
       { key: "decay", label: "Затухание", value: 6, min: 0.1, max: 20, step: 0.1 },
     ],
-    defaultPath: POS, controlName: ctl("Инерция"),
-    code: (n) => afterKey(fx(n("amp")), fx(n("freq")), fx(n("decay")), false),
+    defaultPath: POS, controlName: ctl("Инерция"), linearIn: true,
+    code: (n) => onStop(inertiaBody(fx(n("amp")), fx(n("freq")), fx(n("decay")))),
   },
   {
-    id: "bounce", title: "Отскок", hint: "Отскакивает от конечного значения, как мяч",
+    id: "bounce", title: "Отскок", hint: "Мяч: отскакивает от ключа остановки по параболам",
+    params: [
+      { key: "elastic", label: "Упругость", value: 55, min: 0, max: 95, step: 1 },
+      { key: "gravity", label: "Гравитация", value: 5000, min: 100, max: 50000, step: 100 },
+      { key: "count", label: "Отскоков", value: 4, min: 1, max: 20, step: 1 },
+    ],
+    defaultPath: POS, controlName: ctl("Отскок"), linearIn: true,
+    code: (n) => onStop(ballBody(fx(n("elastic")), fx(n("gravity")), fx(n("count")))),
+  },
+  {
+    id: "elastic", title: "Упругий отскок", hint: "Быстрые затухающие отскоки назад от ключа",
     params: [
       { key: "amp", label: "Сила", value: 6, min: 0, max: 50, step: 0.5 },
       { key: "freq", label: "Частота", value: 2, min: 0.1, max: 10, step: 0.1 },
       { key: "decay", label: "Затухание", value: 5, min: 0.1, max: 20, step: 0.1 },
     ],
-    defaultPath: POS, controlName: ctl("Отскок"),
-    code: (n) => afterKey(fx(n("amp")), fx(n("freq")), fx(n("decay")), true),
+    defaultPath: POS, controlName: ctl("Упругость"), linearIn: true,
+    code: (n) => onStop(elasticBody(fx(n("amp")), fx(n("freq")), fx(n("decay")))),
   },
   {
     id: "lookAt", title: "Смотреть на", hint: "Выделите слои, последним — цель. Меняется поворот",
@@ -106,7 +144,7 @@ export const EXPR_PRESETS: ExprPreset[] = [
 ];
 
 /** Аргументы для host: код + описание ползунков с текущими значениями. */
-export function buildExpression(p: ExprPreset, values: Record<string, number>) {
+export function buildExpression(p: ExprPreset, values: Record<string, number>, linearIn = true) {
   const nameOf = (key: string) => p.controlName(p.params.find((x) => x.key === key)!);
   const controls: { type: string; name: string; value?: number }[] = p.params.map((x) => ({ type: "slider", name: p.controlName(x), value: values[x.key] ?? x.value }));
   if (p.layerControl) controls.unshift({ type: "layer", name: p.layerControl });
@@ -115,6 +153,7 @@ export function buildExpression(p: ExprPreset, values: Record<string, number>) {
     defaultPath: p.defaultPath,
     forceDefault: !!p.forceDefault,
     lookAtLast: !!p.lookAtLast,
+    linearIn: !!p.linearIn && linearIn,
     controls,
   };
 }

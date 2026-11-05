@@ -7,6 +7,8 @@
    *   forceDefault: false,                 true — всегда defaultPath (например, «смотреть на слой» -> Rotation)
    *   controls: [{ type: "slider"|"checkbox"|"layer", name: "...", value: 1 }],   эффекты-ползунки на слое
    *   lookAtLast: false,                   слой-контрол указывает на последний выделенный слой (он сам не меняется)
+   *   linearIn: false,                     сделать вход в ключи линейным (для отскока/инерции нужна скорость прилёта):
+   *                                        выделенные ключи, а если их нет — все ключи кроме первого
    *   undoName
    * }
    */
@@ -24,6 +26,16 @@
     made.name = c.name;
     if (c.value !== undefined && c.value !== null) made.property(1).setValue(c.value);
     return made;
+  }
+
+  function linearizeIn(prop) {
+    if (!prop.canVaryOverTime || prop.numKeys < 2) return;
+    var keys = prop.selectedKeys, L = KeyframeInterpolationType.LINEAR;
+    if (!keys.length) { keys = []; for (var k = 2; k <= prop.numKeys; k++) keys.push(k); }
+    for (var i = 0; i < keys.length; i++) {
+      if (keys[i] < 2) continue;
+      prop.setInterpolationTypeAtKey(keys[i], L, prop.keyOutInterpolationType(keys[i]));
+    }
   }
 
   tools["ae.expression"] = function (args) {
@@ -62,6 +74,7 @@
           if (made && controls[c].type === "layer" && targetLayer) made.property(1).setValue(targetLayer.index);
         }
         for (var t = 0; t < targets.length; t++) {
+          if (args.linearIn) linearizeIn(targets[t]);
           targets[t].expression = args.code;
           targets[t].expressionEnabled = true;
           if (targets[t].expressionError) errors.push(targets[t].expressionError);

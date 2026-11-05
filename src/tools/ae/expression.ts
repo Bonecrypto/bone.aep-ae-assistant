@@ -1,7 +1,8 @@
+import { plural } from "../../lib/format";
 import { buildExpression, EXPR_PRESETS } from "../../presets/expressions";
 import { hostTool, undoHint } from "../host-tool";
 
-export type ExprInput = { preset: string; params?: Record<string, number> };
+export type ExprInput = { preset: string; params?: Record<string, number>; linearIn?: boolean };
 
 export const expression = hostTool<ExprInput>({
   name: "ae.expressionPreset",
@@ -15,6 +16,7 @@ export const expression = hostTool<ExprInput>({
     properties: {
       preset: { type: "string", enum: EXPR_PRESETS.map((p) => p.id), description: "Какое выражение." },
       params: { type: "object", description: "Значения ползунков по ключам пресета, например { freq: 3, amp: 40 }." },
+      linearIn: { type: "boolean", default: true, description: "Для inertia/bounce/elastic: сделать вход в ключи линейным, иначе при Easy Ease эффекта не будет." },
     },
     required: ["preset"],
   },
@@ -22,11 +24,11 @@ export const expression = hostTool<ExprInput>({
   toArgs: (i) => {
     const p = EXPR_PRESETS.find((x) => x.id === i.preset);
     if (!p) return { code: "" };
-    return buildExpression(p, i.params ?? {});
+    return buildExpression(p, i.params ?? {}, i.linearIn ?? true);
   },
   done: (r) => {
     const err = String(r.expressionError ?? "");
-    return err ? `Выражение поставлено, но AE сообщает об ошибке: ${err}` : `Выражение поставлено: ${Number(r.changed)} ${Number(r.changed) === 1 ? "свойство" : "свойств"}.${undoHint}`;
+    return err ? `Выражение поставлено, но AE сообщает об ошибке: ${err}` : `Выражение поставлено: ${Number(r.changed)} ${plural(Number(r.changed), "свойство", "свойства", "свойств")}.${undoHint}`;
   },
 });
 
