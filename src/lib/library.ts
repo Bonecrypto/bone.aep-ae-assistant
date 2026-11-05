@@ -1,5 +1,6 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { getPrefs, setPrefs } from "./store";
+import { logError } from "./errorlog";
 
 /*
  * Библиотека пользователя: папка на диске (можно в облаке — Google Drive, Dropbox, OneDrive).
@@ -20,7 +21,7 @@ const PREVIEW_EXT = ["mp4", "webm", "gif", "png", "jpg", "jpeg"];
 export const KIND_LABEL: Record<LibKind, string> = { template: "Шаблон", preset: "Пресет", video: "Видео", image: "Картинка", audio: "Звук" };
 export const hostKind = (k: LibKind) => (k === "template" ? "template" : k === "preset" ? "preset" : "footage");
 
-type NodeRequire = (m: string) => any;
+export type NodeRequire = (m: string) => any;
 const nodeRequire = (): NodeRequire | null => {
   const w = window as any;
   return typeof w.require === "function" ? w.require : typeof w.cep_node?.require === "function" ? w.cep_node.require : null;
@@ -33,50 +34,65 @@ export function fileUrl(p: string) {
   return "file:///" + parts.filter((x, i) => x || i > 0).map((s, i) => (i === 0 && /^[A-Za-z]:$/.test(s) ? s : encodeURIComponent(s))).join("/").replace(/^\/+/, "");
 }
 
-function scanRoot(req: NodeRequire, root: string): LibItem[] {
+export type ScanProblem = { path: string; message: string };
+
+/**
+ * Обход папки библиотеки. Тип записи определяется через stat, а не по Dirent:
+ * в «Документах» из OneDrive файлы «только в облаке» — это точки повторного анализа,
+ * и Dirent.isFile() для них false. Ошибки не глотаются — возвращаются списком.
+ */
+export function scanRoot(req: NodeRequire, root: string, problems: ScanProblem[] = []): LibItem[] {
   const fs = req("fs"), path = req("path");
   const items: LibItem[] = [];
+  const baseOf = (f: string) => f.replace(/\.[^.]+$/, "");
+  const extOf = (f: string) => (f.includes(".") ? f.split(".").pop()!.toLowerCase() : "");
   const walk = (dir: string, depth: number) => {
-    let entries: any[] = [];
-    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
-    const files = entries.filter((e) => e.isFile()).map((e) => e.name as string);
+    let names: string[] = [];
+    try { names = fs.readdirSync(dir); } catch (e) { problems.push({ path: dir, message: String((e as Error).message ?? e) }); return; }
+    const files: { name: string; full: string; st: any }[] = [];
+    const dirs: string[] = [];
+    for (const name of names) {
+      if (name.startsWith(".")) continue;
+      const full = path.join(dir, name);
+      let st: any;
+      try { st = fs.statSync(full); } catch (e) { problems.push({ path: full, message: String((e as Error).message ?? e) }); continue; }
+      if (st.isDirectory()) { if (!name.startsWith("_")) dirs.push(full); }
+      else files.push({ name, full, st });
+    }
+    let previewFiles: string[] = [];
     const previewsDir = path.join(dir, "_previews");
-    const previewFiles: string[] = fs.existsSync(previewsDir) ? fs.readdirSync(previewsDir) : [];
-    const baseOf = (f: string) => f.replace(/\.[^.]+$/, "");
-    const extOf = (f: string) => (f.includes(".") ? f.split(".").pop()!.toLowerCase() : "");
-    // база имён шаблонов/пресетов: медиафайл с таким же именем рядом — это превью, а не отдельный элемент
-    const mainBases = new Set(files.filter((f) => ["template", "preset"].includes(KIND[extOf(f)])).map((f) => baseOf(f).toLowerCase()));
-    for (const f of files) {
-      if (f.startsWith(".") || f.startsWith("_")) continue;
+    try { if (fs.existsSync(previewsDir)) previewFiles = fs.readdirSync(previewsDir); } catch { /* без превью */ }
+    const fileNames = files.map((f) => f.name);
+    // медиафайл с тем же именем, что шаблон/пресет рядом, — это его превью, а не отдельный элемент
+    const mainBases = new Set(fileNames.filter((f) => ["template", "preset"].includes(KIND[extOf(f)])).map((f) => baseOf(f).toLowerCase()));
+    const rel = path.relative(root, dir).split(path.sep).filter(Boolean).join(" / ");
+    for (const { name: f, full, st } of files) {
+      if (f.startsWith("_")) continue;
       const ext = extOf(f), kind = KIND[ext];
       if (!kind) continue;
       const isMain = kind === "template" || kind === "preset";
       if (!isMain && PREVIEW_EXT.includes(ext) && mainBases.has(baseOf(f).toLowerCase())) continue;
-      const full = path.join(dir, f);
-      let st: any;
-      try { st = fs.statSync(full); } catch { continue; }
       const findPreview = () => {
         const b = baseOf(f).toLowerCase();
         for (const pe of PREVIEW_EXT) {
-          const same = files.find((x) => x !== f && x.toLowerCase() === `${b}.${pe}`);
+          const same = fileNames.find((x) => x !== f && x.toLowerCase() === `${b}.${pe}`);
           if (same) return path.join(dir, same);
           const inDir = previewFiles.find((x) => x.toLowerCase() === `${b}.${pe}`);
           if (inDir) return path.join(previewsDir, inDir);
         }
         return kind === "image" && ["png", "jpg", "jpeg", "gif"].includes(ext) ? full : kind === "video" && ["mp4", "webm"].includes(ext) ? full : undefined;
       };
-      const rel = path.relative(root, dir).split(path.sep).filter(Boolean).join(" / ");
       items.push({ path: full, name: baseOf(f), ext, kind, category: rel || "Разное", root, preview: findPreview(), mtime: st.mtimeMs, size: st.size });
     }
-    if (depth < 4) for (const e of entries) if (e.isDirectory() && !e.name.startsWith(".") && !e.name.startsWith("_")) walk(path.join(dir, e.name), depth + 1);
+    if (depth < 8) for (const d of dirs) walk(d, depth + 1);
   };
   walk(root, 0);
   return items;
 }
 
 // ---------- хранилище со слежением за папками ----------
-type State = { items: LibItem[]; scanning: boolean; error: string };
-let state: State = { items: [], scanning: false, error: "" };
+type State = { items: LibItem[]; scanning: boolean; error: string; problems: ScanProblem[] };
+let state: State = { items: [], scanning: false, error: "", problems: [] };
 const ls = new Set<() => void>();
 const set = (s: Partial<State>) => { state = { ...state, ...s }; ls.forEach((l) => l()); };
 let watchers: any[] = [];
@@ -85,12 +101,14 @@ let timer: any = null;
 export function rescan() {
   const req = nodeRequire();
   const folders = getPrefs().libraryFolders;
-  if (!req) { set({ items: demoItems(), scanning: false, error: "" }); return; }
+  if (!req) { set({ items: demoItems(), scanning: false, error: "", problems: [] }); return; }
   set({ scanning: true });
   const fs = req("fs");
   const items: LibItem[] = [];
   const missing: string[] = [];
-  for (const f of folders) { if (fs.existsSync(f)) items.push(...scanRoot(req, f)); else missing.push(f); }
+  const problems: ScanProblem[] = [];
+  for (const f of folders) { if (fs.existsSync(f)) items.push(...scanRoot(req, f, problems)); else missing.push(f); }
+  if (problems.length) logError({ tool: "library.scan", code: "SCAN", message: `Не прочитано: ${problems.length}`, args: problems.slice(0, 5).map((p) => `${p.path}: ${p.message}`).join(" | ") });
   items.sort((a, b) => a.category.localeCompare(b.category, "ru") || a.name.localeCompare(b.name, "ru"));
   // первый просмотр папки: всё, что уже было, не считается «новым»
   const p = getPrefs();
@@ -100,7 +118,7 @@ export function rescan() {
     for (const it of items) if (fresh.includes(it.root)) seen[it.path] = it.mtime;
     setPrefs({ librarySeen: seen, libraryKnownRoots: [...p.libraryKnownRoots, ...fresh] });
   }
-  set({ items, scanning: false, error: missing.length ? `Папка не найдена: ${missing.join(", ")}` : "" });
+  set({ items, scanning: false, problems, error: missing.length ? `Папка не найдена: ${missing.join(", ")}` : "" });
 }
 
 function watchAll() {
@@ -173,7 +191,8 @@ const README = `Библиотека AE Assistant
 function demoItems(): LibItem[] {
   const mk = (name: string, ext: string, category: string, mtime = 1): LibItem => ({ path: `C:/Библиотека/${category}/${name}.${ext}`, name, ext, kind: KIND[ext], category, root: "C:/Библиотека", mtime, size: 1 });
   return [
-    mk("Зум-переход", "aep", "Переходы"), mk("Хлыст вправо", "aep", "Переходы"), mk("Свет-вспышка", "ffx", "Переходы"),
+    mk("Зум-переход", "aep", "02_Transitions / 01_Clean"), mk("Хлыст вправо", "aep", "02_Transitions / 01_Clean"), mk("Свет-вспышка", "ffx", "02_Transitions / 03_Glitch"),
+    mk("left side bounce", "ffx", "01_Text / 01_Text Animations"), mk("typewriter", "ffx", "01_Text / 01_Text Animations"), mk("gold", "ffx", "01_Text / 02_Text_FX"),
     mk("Титр Lower Third", "aep", "Шаблоны"), mk("Заголовок неон", "aep", "Шаблоны", Date.now()),
     mk("Вжух", "wav", "Звуки"), mk("Клик", "wav", "Звуки"), mk("Стрелка", "png", "Элементы"), mk("Пыль", "mp4", "Фоны"),
     mk("Плавный въезд", "ffx", "Пресеты"),

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { runTool } from "../lib/actions";
 import { useBusy } from "../lib/busy";
 import { addFolder, createStructure, fileUrl, isNew, KIND_LABEL, libraryAvailable, markSeen, removeFolder, rescan, useLibrary, type LibItem } from "../lib/library";
@@ -30,17 +30,12 @@ export function LibrarySection() {
     setPrefs({ favorites: favorites.includes(k) ? favorites.filter((f) => f !== k) : [...favorites, k] });
   };
 
-  const cats = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const it of lib.items) m.set(it.category, (m.get(it.category) ?? 0) + 1);
-    return [...m.entries()];
-  }, [lib.items]);
   const newItems = lib.items.filter(isNew);
 
   const shown = lib.items.filter((it) => {
     if (cat === NEW && !isNew(it)) return false;
     if (cat === FAV && !fav(it)) return false;
-    if (cat !== ALL && cat !== NEW && cat !== FAV && it.category !== cat) return false;
+    if (cat !== ALL && cat !== NEW && cat !== FAV && it.category !== cat && !it.category.startsWith(cat + " / ")) return false;
     const s = q.trim().toLowerCase();
     return !s || `${it.name} ${it.category} ${KIND_LABEL[it.kind]}`.toLowerCase().includes(s);
   });
@@ -62,15 +57,19 @@ export function LibrarySection() {
   }
   if (libraryFolders.length === 0 && libraryAvailable()) return <Empty onPick={pick} />;
 
-  const catButton = (id: string, label: string, n: number) => (
-    <button key={id} className={`cat${cat === id ? " on" : ""}`} onClick={() => setCat(id)}><span>{label}</span><em>{n}</em></button>
+  const tree = buildTree(lib.items);
+  const special = (
+    <>
+      <button className={`cat${cat === ALL ? " on" : ""}`} onClick={() => setCat(ALL)}><span>Всё</span><em>{lib.items.length}</em></button>
+      {newItems.length > 0 && <button className={`cat${cat === NEW ? " on" : ""}`} onClick={() => setCat(NEW)}><span>Новое</span><em>{newItems.length}</em></button>}
+      {favorites.some((f) => f.startsWith("lib:")) && <button className={`cat${cat === FAV ? " on" : ""}`} onClick={() => setCat(FAV)}><span>Избранное</span><em>{lib.items.filter(fav).length}</em></button>}
+    </>
   );
   const categories = (
     <>
-      {catButton(ALL, "Всё", lib.items.length)}
-      {newItems.length > 0 && catButton(NEW, "Новое", newItems.length)}
-      {favorites.some((f) => f.startsWith("lib:")) && catButton(FAV, "Избранное", lib.items.filter(fav).length)}
-      {cats.map(([c, n]) => catButton(c, c, n))}
+      {special}
+      <div className="cat-sep" />
+      <Tree nodes={tree} current={cat} onPick={setCat} />
     </>
   );
 
@@ -92,7 +91,16 @@ export function LibrarySection() {
           {!wide && <button className="pill" onClick={() => setShowFolders(!showFolders)}>Папки</button>}
           {newItems.length > 0 && <button className="pill" onClick={() => markSeen(newItems)} title="Снять отметки «Новое»">Просмотрено</button>}
         </header>
-        {!wide && <div className="cat-row">{categories}</div>}
+        {!wide && (
+          <div className="cat-select">
+            <select value={cat} onChange={(e) => setCat(e.target.value)}>
+              <option value={ALL}>Всё ({lib.items.length})</option>
+              {newItems.length > 0 && <option value={NEW}>Новое ({newItems.length})</option>}
+              {favorites.some((f) => f.startsWith("lib:")) && <option value={FAV}>Избранное</option>}
+              {flatten(tree).map(({ node, depth }) => <option key={node.path} value={node.path}>{"\u00a0\u00a0".repeat(depth)}{node.name} ({node.count})</option>)}
+            </select>
+          </div>
+        )}
         {showFolders && (
           <div className="folders">
             {libraryFolders.map((f) => (
@@ -107,6 +115,11 @@ export function LibrarySection() {
           </div>
         )}
         {lib.error && <div className="lib-error">{lib.error}</div>}
+        {lib.problems.length > 0 && (
+          <div className="lib-error" title={lib.problems.slice(0, 10).map((p) => `${p.path}: ${p.message}`).join("\n")}>
+            Не удалось прочитать: {lib.problems.length} (подробности — в журнале ошибок в настройках). Если папка в OneDrive — включите «Всегда хранить на этом устройстве».
+          </div>
+        )}
         <div className="lib-grid">
           {shown.length === 0 && <div className="empty">{lib.scanning ? "Читаю папку…" : q ? "Ничего не нашлось" : "Здесь пока пусто — положите файлы в папку библиотеки"}</div>}
           {shown.map((it) => (
@@ -174,5 +187,50 @@ function Empty({ onPick, note }: { onPick: () => void; note?: string }) {
         <button className="btn primary" onClick={onPick}>Выбрать папку</button>
       </div>
     </section>
+  );
+}
+
+// ---------- дерево папок ----------
+type Node = { name: string; path: string; count: number; children: Node[] };
+
+/** Категории "A / B / C" -> дерево со счётчиками (включая вложенное). */
+function buildTree(items: LibItem[]): Node[] {
+  const roots: Node[] = [];
+  for (const it of items) {
+    let level = roots, acc = "";
+    for (const part of it.category.split(" / ")) {
+      acc = acc ? `${acc} / ${part}` : part;
+      let n = level.find((x) => x.name === part);
+      if (!n) { n = { name: part, path: acc, count: 0, children: [] }; level.push(n); }
+      n.count++;
+      level = n.children;
+    }
+  }
+  const sort = (ns: Node[]) => { ns.sort((a, b) => a.name.localeCompare(b.name, "ru", { numeric: true })); ns.forEach((n) => sort(n.children)); };
+  sort(roots);
+  return roots;
+}
+
+const flatten = (ns: Node[], depth = 0): { node: Node; depth: number }[] => ns.flatMap((n) => [{ node: n, depth }, ...flatten(n.children, depth + 1)]);
+
+function Tree({ nodes, current, onPick, depth = 0 }: { nodes: Node[]; current: string; onPick: (p: string) => void; depth?: number }) {
+  const [open, setOpen] = useState<Record<string, boolean>>({});
+  return (
+    <>
+      {nodes.map((n) => {
+        const isOpen = open[n.path] ?? (current === n.path || current.startsWith(n.path + " / "));
+        return (
+          <div key={n.path}>
+            <div className={`cat tree${current === n.path ? " on" : ""}`} style={{ paddingLeft: 6 + depth * 12 }} onClick={() => onPick(n.path)} role="button" tabIndex={0}>
+              {n.children.length > 0
+                ? <button className={`twisty${isOpen ? " open" : ""}`} onClick={(e) => { e.stopPropagation(); setOpen({ ...open, [n.path]: !isOpen }); }}>▸</button>
+                : <span className="twisty" />}
+              <span>{n.name}</span><em>{n.count}</em>
+            </div>
+            {isOpen && n.children.length > 0 && <Tree nodes={n.children} current={current} onPick={onPick} depth={depth + 1} />}
+          </div>
+        );
+      })}
+    </>
   );
 }
