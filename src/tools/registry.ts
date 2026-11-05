@@ -7,12 +7,16 @@ import { textCopyStyle, textPasteStyle } from "./ae/text";
 import { compInfo, labelByType, precompose, removeUnused, sequence } from "./ae/service";
 import { motion } from "./ae/motion";
 import { applyPreset } from "./preset-tool";
+import { sceneTransition } from "./ae/scene";
+import { libraryTools } from "./ae/library";
+import { getLibraryItems } from "../lib/library";
 
 // Все инструменты, доступные ИИ в чате. Новая возможность = новый файл в tools/ + строка здесь.
 export const tools: Tool<any>[] = [
   compInfo,
   applyPreset,
-  motion, animate,
+  motion, animate, sceneTransition,
+  ...libraryTools(getLibraryItems),
   ease, readEase,
   expression, customExpression, clearExpression,
   createLayer, addEffect, element,

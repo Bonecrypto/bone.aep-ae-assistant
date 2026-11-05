@@ -48,8 +48,11 @@ host/src/*.jsx              ExtendScript, склеивается в host/index.j
   40_create 45_style        слои, эффекты, стили с параметрами
   50_text 55_textfx         стиль текста, анимация по буквам/словам/строкам (Expression Selector)
   60_elements 70_service    шейп-элементы, сервис
+  65_scene                  переходы между сценами на склейке (корректирующий слой: Transform, Motion Tile, Blur)
+  75_library                библиотека пользователя: импорт .aep/.ffx/медиа без дублей, выравнивание по маркеру
   80_info                   сводки для чата и строки состояния
 src/presets/                пресеты вкладок: модель Preset {controls, preview, build} в types.ts, сводка в all.ts
+src/lib/library.ts          сканирование папок библиотеки (Node), слежение за изменениями, «Новое»
 src/ui/Browser.tsx          вкладка-браузер: список слева, превью, ползунки, «Применить»
 src/tools/                  инструменты { name, description, inputSchema, mutates, run } — их видят кнопки и ИИ
 src/tools/preset-tool.ts    ae.applyPreset — ИИ применяет любой пресет по имени

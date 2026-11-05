@@ -63,10 +63,12 @@ export class Group {
   }
 }
 
-const effectFactory = (m) => () => new Group(m, m === "ADBE Drop Shadow"
-  ? [new Prop("Color", [0, 0, 0, 1], PVT.COLOR), new Prop("Opacity", 127), new Prop("Direction", 135), new Prop("Distance", 5), new Prop("Softness", 0)]
-  : [new Prop(m + " value", 0)]);
-const EFFECTS = ["ADBE Gaussian Blur 2", "ADBE Slider Control", "ADBE Checkbox Control", "ADBE Layer Control", "ADBE Angle Control", "ADBE Glo2", "ADBE Gaussian Blur 2", "ADBE Tint", "ADBE Fill", "ADBE Drop Shadow"];
+const many = (n, first = 0) => Array.from({ length: n }, (_, i) => new Prop("p" + (i + 1), i === 1 && first ? first : 0));
+const effectFactory = (m) => () => new Group(m,
+  m === "ADBE Drop Shadow" ? [new Prop("Color", [0, 0, 0, 1], PVT.COLOR), new Prop("Opacity", 127), new Prop("Direction", 135), new Prop("Distance", 5), new Prop("Softness", 0)]
+  : m === "ADBE Geometry2" ? [new Prop("Anchor", [960, 540], PVT.TwoD_SPATIAL), new Prop("Position", [960, 540], PVT.TwoD_SPATIAL), ...many(10)]
+  : m === "ADBE Tile" ? many(8) : m === "ADBE Gaussian Blur 2" ? many(3) : [new Prop(m + " value", 0)]);
+const EFFECTS = ["ADBE Geometry2", "ADBE Tile", "ADBE Gaussian Blur 2", "ADBE Slider Control", "ADBE Checkbox Control", "ADBE Layer Control", "ADBE Angle Control", "ADBE Glo2", "ADBE Gaussian Blur 2", "ADBE Tint", "ADBE Fill", "ADBE Drop Shadow"];
 
 function transform(pos) {
   const p = new Prop("Position", [...pos], PVT.TwoD_SPATIAL, "ADBE Position");
@@ -87,7 +89,8 @@ export class Layer {
   property(n) { return this.groups[n] ?? null; }
   sourceRectAtTime() { return this.rect; }
   setParentWithJump(p) { this.parent = p; }
-  moveBefore() {}
+  moveBefore(other) { this.movedBefore = other; }
+  moveToBeginning() { this.atTop = true; }
   remove() { this.removed = true; }
   get index() { return this.comp ? this.comp.list.indexOf(this) + 1 : 1; }
 }
@@ -111,6 +114,7 @@ export function makeContext(activeItem) {
         addCamera(name) { return comp.attach(new CameraLayer({ name }), true); },
         addShape() { const l = new ShapeLayer({ name: "Shape" }); l.groups["ADBE Root Vectors Group"] = vectorsGroup("ADBE Root Vectors Group"); return comp.attach(l, true); },
         precompose(idx, name) { comp.precomposed = { idx, name }; return { name }; },
+        add(source) { const l = new AVLayer({ name: source.name }); l.source = source; return comp.attach(l, true); },
       };
     }
     attach(l, top = false) { l.comp = this; if (top) this.list.unshift(l); else this.list.push(l); return l; }
@@ -119,6 +123,18 @@ export function makeContext(activeItem) {
     get selectedLayers() { return this.list.filter((l) => l.selected && !l.removed); }
   }
   class SolidSource {}
+  // ---------- проект, папки, файлы, импорт ----------
+  class FolderItem { constructor(name) { this.name = name; this.comment = ""; this.list = []; this._parent = null; }
+    get numItems() { return this.list.length; } item(i) { return this.list[i - 1]; }
+    get parentFolder() { return this._parent; } set parentFolder(f) { if (this._parent) this._parent.list = this._parent.list.filter((x) => x !== this); this._parent = f; f.list.push(this); } }
+  class FootageItem { constructor(name) { this.name = name; this.comment = ""; this._parent = null; }
+    get parentFolder() { return this._parent; } set parentFolder(f) { if (this._parent) this._parent.list = this._parent.list.filter((x) => x !== this); this._parent = f; f.list.push(this); } }
+  const files = new Set();
+  class File { constructor(p) { this.fsName = p; } get exists() { return files.has(this.fsName); } get parent() { return new Folder(this.fsName.replace(/[\\/][^\\/]*$/, "")); } }
+  class Folder { constructor(p) { this.fsName = p; } get exists() { return files.has(this.fsName + "/"); } execute() { ctx.revealed = this.fsName; } }
+  Folder.selectDialog = () => new Folder("C:/Библиотека");
+  class ImportOptions { constructor(f) { this.file = f; } canImportAs() { return /\.aep$/i.test(this.file.fsName); } }
+  const root = new FolderItem("root");
   function vectorsGroup(m) {
     return new Group(m, [], { addable: {
       "ADBE Vector Group": () => new Group("ADBE Vector Group", [vectorsGroup("ADBE Vectors Group")]),
@@ -145,9 +161,22 @@ export function makeContext(activeItem) {
 
   const ctx = {
     CompItem, AVLayer, TextLayer, ShapeLayer, CameraLayer, LightLayer, SolidSource, KeyframeEase, Shape,
+    FolderItem, FootageItem, File, Folder, ImportOptions, ImportAsType: { PROJECT: 1, FOOTAGE: 2 },
     PropertyValueType: PVT, PropertyType: PT,
     KeyframeInterpolationType: { LINEAR, BEZIER, HOLD: 6614 },
-    app: { version: "26.5x89", project: { activeItem: null, numItems: 3, removeUnusedFootage: () => 2 }, beginUndoGroup: (n) => undo.push("begin:" + n), endUndoGroup: () => undo.push("end") },
+    app: { version: "26.5x89", project: { activeItem: null, numItems: 3, removeUnusedFootage: () => 2, rootFolder: root,
+      items: { addFolder: (n) => { const f = new FolderItem(n); f.parentFolder = root; return f; } },
+      importFile: (io) => {
+        ctx.imports = (ctx.imports ?? 0) + 1;
+        const base = io.file.fsName.split(/[\\/]/).pop().replace(/\.[^.]+$/, "");
+        if (io.importAs === 1) {
+          const f = new FolderItem(base + ".aep");
+          const inner = new CompItem([]); inner.name = "Внутренняя"; inner.usedIn = [{}];
+          const main = new CompItem([]); main.name = base; main.usedIn = []; main.markerProperty.setValueAtTime(0.5, null);
+          f.list.push(inner, main); f.parentFolder = root; return f;
+        }
+        const it = new FootageItem(base); it.parentFolder = root; return it;
+      } }, beginUndoGroup: (n) => undo.push("begin:" + n), endUndoGroup: () => undo.push("end") },
   };
   ctx.$ = { global: ctx };
   // host выполняется в том же «мире», что и тест: те же Array/Object, без vm-песочницы
@@ -155,7 +184,7 @@ export function makeContext(activeItem) {
   const comp = activeItem === null ? null : new CompItem(activeItem ?? []);
   ctx.app.project.activeItem = comp;
   return {
-    ctx, comp, undo, makeText, Layer: AVLayer,
+    ctx, comp, undo, makeText, Layer: AVLayer, files, root,
     run: (name, args) => JSON.parse(ctx.AEA.run(name, args)),
   };
 }

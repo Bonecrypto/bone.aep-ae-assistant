@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import type { Pose, PreviewSpec } from "../presets/types";
+import { fileUrl } from "../lib/library";
 
 const HOLD = 0.9; // пауза после анимации перед повтором, с
 
@@ -21,7 +22,7 @@ export function Preview({ spec, replay }: { spec: PreviewSpec; replay: number })
   const start = useRef(performance.now());
   useEffect(() => { start.current = performance.now(); }, [replay, spec]);
   useEffect(() => {
-    if (spec.kind === "node") return;
+    if (spec.kind === "node" || spec.kind === "media") return;
     let raf = 0;
     const loop = () => {
       const len = spec.length + HOLD;
@@ -33,6 +34,19 @@ export function Preview({ spec, replay }: { spec: PreviewSpec; replay: number })
   }, [spec]);
 
   if (spec.kind === "node") return <div className="stage">{spec.node}</div>;
+  if (spec.kind === "media") return <div className="stage"><MediaPreview path={spec.path} /></div>;
+
+  if (spec.kind === "cut") {
+    const cut = spec.length / 2, near = Math.max(0, 1 - Math.abs(t - cut) / (spec.length / 2));
+    return (
+      <div className="stage cut-stage">
+        <div className="scene a" style={style(spec.pose(0, t))}>A</div>
+        <div className="scene b" style={style(spec.pose(1, t))}>B</div>
+        {spec.flash ? <div className="flash" style={{ opacity: Math.pow(near, 3) * spec.flash }} /> : null}
+        {spec.dip ? <div className="dip" style={{ opacity: Math.pow(near, 1.5) }} /> : null}
+      </div>
+    );
+  }
 
   if (spec.kind === "layers") {
     return (
@@ -60,4 +74,14 @@ export function Preview({ spec, replay }: { spec: PreviewSpec; replay: number })
       </div>
     </div>
   );
+}
+
+/** Видео/гифка/картинка из папки пользователя. Видео играет без звука по кругу. */
+export function MediaPreview({ path, hover }: { path: string; hover?: boolean }) {
+  const url = fileUrl(path);
+  if (/\.(mp4|webm)$/i.test(path)) {
+    return <video className="media" src={url} muted loop playsInline autoPlay={!hover}
+      onMouseEnter={(e) => hover && e.currentTarget.play().catch(() => {})} onMouseLeave={(e) => { if (hover) { e.currentTarget.pause(); e.currentTarget.currentTime = 0; } }} />;
+  }
+  return <img className="media" src={url} alt="" />;
 }

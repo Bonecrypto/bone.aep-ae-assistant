@@ -297,3 +297,34 @@ test("тряска на позиции с раздельными измерен�
   tr.property("ADBE Position").dimensionsSeparated = true;
   assert.equal(run("ae.expressions", { items: [{ path: ["ADBE Transform Group", "ADBE Position"], code: "x" }], controls: [] }).code, "SEPARATED_DIMENSIONS");
 });
+
+// ---------- библиотека и переходы между сценами ----------
+test("библиотека: шаблон .aep — импорт, главная композиция, маркер на текущее время, без повторного импорта", () => {
+  const h = makeContext([]);
+  h.files.add("C:/Lib/Переходы/Зум.aep");
+  const r = h.run("ae.libImport", { path: "C:/Lib/Переходы/Зум.aep", kind: "template", base: "Зум", binName: "Библиотека" });
+  assert.equal(r.ok, true); assert.equal(r.source, "Зум"); assert.equal(r.alignedToMarker, true);
+  const layer = h.comp.layer(1);
+  assert.ok(Math.abs(layer.startTime - 0.5) < 1e-9, "маркер 0,5 с встал на время 1 с");
+  h.run("ae.libImport", { path: "C:/Lib/Переходы/Зум.aep", kind: "template", base: "Зум", binName: "Библиотека" });
+  assert.equal(h.ctx.imports, 1, "второй раз берём из проекта");
+  assert.equal(h.root.list.filter((x) => x.name === "Библиотека").length, 1);
+});
+test("библиотека: звук/видео в текущее время; нет файла — понятная ошибка", () => {
+  const h = makeContext([]);
+  h.files.add("C:/Lib/Звуки/whoosh.wav");
+  const r = h.run("ae.libImport", { path: "C:/Lib/Звуки/whoosh.wav", kind: "footage", binName: "Библиотека" });
+  assert.equal(r.added, true); assert.equal(h.comp.layer(1).startTime, 1);
+  assert.equal(h.run("ae.libImport", { path: "C:/нет.wav", kind: "footage" }).code, "FILE_MISSING");
+  assert.equal(h.run("ae.pickFolder", {}).path, "C:/Библиотека");
+});
+test("переход на склейке: слой по центру склейки, ключи с рывком на склейке", () => {
+  const h = makeContext([]);
+  const r = h.run("ae.sceneTransition", { kind: "zoomIn", duration: 0.6, amount: 100, name: "Зум" });
+  assert.equal(r.ok, true); assert.equal(r.failedParams, 0);
+  const l = h.comp.layer(1);
+  assert.equal(l.adjustmentLayer, true); assert.ok(Math.abs(l.inPoint - 0.7) < 1e-9 && Math.abs(l.outPoint - 1.3) < 1e-9);
+  const tf = l.property("ADBE Effect Parade").property(2);
+  assert.deepEqual(tf.property(4).keys.map((k) => Math.round(k.v)), [100, 300, 33, 100]);
+  for (const kind of ["dip", "flash", "blur", "zoomOut", "spin", "whip"]) assert.equal(h.run("ae.sceneTransition", { kind, side: "left" }).ok, true, kind);
+});

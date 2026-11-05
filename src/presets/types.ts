@@ -17,7 +17,11 @@ export type Pose = { x?: number; y?: number; s?: number; r?: number; o?: number;
 export type PreviewSpec =
   | { kind: "layers"; count: number; length: number; pose: (i: number, t: number) => Pose; label?: string }
   | { kind: "text"; text: string; unit: "chars" | "words" | "lines"; length: number; pose: (i: number, n: number, t: number) => Pose }
-  | { kind: "node"; node: ReactNode };
+  | { kind: "node"; node: ReactNode }
+  /** Склейка двух кадров: i=0 — кадр A (до склейки), i=1 — кадр B. */
+  | { kind: "cut"; length: number; pose: (i: number, t: number) => Pose; flash?: number; dip?: boolean }
+  /** Превью-файл пользователя (видео/картинка). */
+  | { kind: "media"; path: string };
 
 export type Selection = { comp: string | null; selected: number; text: number; keys: number };
 

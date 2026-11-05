@@ -9,12 +9,16 @@ import { hexToRgb, plural } from "./lib/format";
 import { TABS_PRESETS } from "./presets/all";
 import { ChatSection } from "./sections/Chat";
 import { EaseSection } from "./sections/Ease";
+import { LibrarySection } from "./sections/Library";
+import { libraryTransitions } from "./presets/transitions";
+import { useLibrary } from "./lib/library";
 import { SettingsSection } from "./sections/Settings";
 import { Browser } from "./ui/Browser";
 import { Palette } from "./ui/Palette";
-import { IconBraces, IconChat, IconCurve, IconGear, IconLayers, IconPlus, IconSearch, IconSparkles, IconText, IconWave, IconWrench } from "./ui/icons";
+import { IconFolder, IconBraces, IconChat, IconCurve, IconGear, IconLayers, IconPlus, IconSearch, IconSparkles, IconText, IconWave, IconWrench } from "./ui/icons";
 
 const TABS = [
+  { id: "library", title: "Библиотека", icon: IconFolder },
   { id: "ease", title: "Скорость", icon: IconCurve },
   { id: "text", title: "Текст", icon: IconText },
   { id: "transitions", title: "Переходы", icon: IconLayers },
@@ -71,7 +75,10 @@ export function App() {
   }, [accent, theme]);
 
   const current = tab === "settings" ? null : TABS.find((t) => t.id === tab) ?? TABS[0];
-  const browser = current && TABS_PRESETS[current.id];
+  const lib = useLibrary();
+  const base = current && TABS_PRESETS[current.id];
+  // во вкладку «Переходы» добавляются переходы из библиотеки пользователя
+  const browser = base && current!.id === "transitions" ? { ...base, presets: [...base.presets, ...libraryTransitions(lib.items)] } : base;
 
   const info = sel.comp
     ? `${sel.comp}${sel.selected ? ` · ${sel.selected} ${plural(sel.selected, "слой", "слоя", "слоёв")}` : ""}`
@@ -97,6 +104,7 @@ export function App() {
       <main className="main">
         {tab === "settings" && <SettingsSection />}
         {current?.id === "ease" && <EaseSection />}
+        {current?.id === "library" && <LibrarySection />}
         {current?.id === "chat" && <ChatSection onOpenSettings={() => goTo("settings")} />}
         {browser && <Browser key={current!.id} id={current!.id} title={browser.title} presets={browser.presets} />}
       </main>

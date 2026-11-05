@@ -24,6 +24,9 @@ export type Prefs = {
   accent: string;
   theme: "dark" | "light";
   customCurves: { id: string; title: string; curve: [number, number, number, number] }[];
+  libraryFolders: string[];
+  librarySeen: Record<string, number>;
+  libraryKnownRoots: string[];
 };
 
 const defaults: Prefs = {
@@ -47,6 +50,9 @@ const defaults: Prefs = {
   accent: "#9f18ec",
   theme: "dark",
   customCurves: [],
+  libraryFolders: [],
+  librarySeen: {},
+  libraryKnownRoots: [],
 };
 
 const KEY = "aea.prefs.v1";

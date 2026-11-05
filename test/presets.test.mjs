@@ -75,3 +75,11 @@ test("все пресеты вкладок собирают действие с 
   }
   assert.ok(n > 60, `пресетов: ${n}`);
 });
+
+test("id пресетов уникальны внутри вкладки", () => {
+  for (const [tab, t] of Object.entries(TABS_PRESETS)) {
+    const ids = t.presets.map((p) => p.id);
+    const dup = ids.filter((id, i) => ids.indexOf(id) !== i);
+    assert.deepEqual(dup, [], `${tab}: повторяются ${dup.join(", ")}`);
+  }
+});

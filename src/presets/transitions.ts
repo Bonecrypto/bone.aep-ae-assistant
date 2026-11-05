@@ -1,6 +1,9 @@
 import { easeIn, easeOut, type EaseKind } from "../lib/easing";
 import { layersWord } from "../lib/format";
 import { motion, type MotionInput } from "../tools/ae/motion";
+import { sceneTransition, type SceneKind } from "../tools/ae/scene";
+import { libImport } from "../tools/ae/library";
+import type { LibItem } from "../lib/library";
 import { act, DIR_SEG, slider, type Ctl, type Pose, type Preset, type Values } from "./types";
 
 // Переходы слоёв. Каждый пресет — набор свойств для ae.motion + те же формулы для превью.
@@ -70,3 +73,61 @@ export const TRANSITIONS: Preset[] = [
     (v) => ({ move: { dir: v.side, distance: v.distance }, fade: true }), true),
   make("fadeSeq", "Проявление по очереди", "Каскад прозрачности", "Каскад", [], () => ({ fade: true }), true),
 ];
+
+// ---------- переходы между сценами (на склейке) ----------
+/** Превью «кадр A → кадр B»: склейка посередине. */
+function scenePose(kind: SceneKind, v: Values, i: number, t: number): Pose {
+  const L = v.duration, cut = L / 2, a = v.amount / 100;
+  const isA = i === 0, before = t < cut;
+  if ((isA && !before) || (!isA && before)) return { o: 0 };
+  const p = before ? t / cut : (t - cut) / cut; // 0..1 внутри половины
+  const inT = p * p, outT = 1 - (1 - p) * (1 - p);
+  switch (kind) {
+    case "dip": return {}; // затемнение рисует чёрный слой поверх
+    case "flash": return { o: 1, b: 0, s: 1 };
+    case "blur": return { b: (before ? inT : 1 - outT) * 14 * a };
+    case "zoomIn": return before ? { s: 1 + inT * 2 * a, b: inT * 6 } : { s: 0.33 + outT * 0.67, b: (1 - outT) * 6 };
+    case "zoomOut": return before ? { s: 1 - inT * 0.67, b: inT * 6 } : { s: 1 + (1 - outT) * 2 * a, b: (1 - outT) * 6 };
+    case "spin": return { r: (before ? inT : -(1 - outT)) * 180 * a, b: (before ? inT : 1 - outT) * 5 };
+    case "whip": {
+      const k = v.side === "left" || v.side === "up" ? -1 : 1, D = 220 * a;
+      const off = before ? k * D * inT : -k * D * (1 - outT);
+      return v.side === "up" || v.side === "down" ? { y: off * 0.5, b: Math.abs(off) / 30 } : { x: off, b: Math.abs(off) / 30 };
+    }
+  }
+  return {};
+}
+
+function scene(id: string, title: string, subtitle: string, kind: SceneKind, extra: Ctl[] = [], amount = 100): Preset {
+  return {
+    id, title, subtitle, group: "Между сценами",
+    controls: [slider("duration", "Длительность", 0.6, 0.1, 3, 0.05, "с"), ...extra, slider("amount", "Сила", amount, 10, 300, 1, "%"),
+      ...(["zoomIn", "zoomOut", "whip", "spin"].includes(kind) ? [{ type: "toggle", key: "motionBlur", label: "Размытие движения", value: true } as Ctl] : [])],
+    preview: (v) => ({ kind: "cut", length: v.duration, flash: kind === "flash" ? v.amount / 100 : 0, dip: kind === "dip", pose: (i, t) => scenePose(kind, v, i, t) }),
+    hint: () => "Поставьте время на склейку — переход встанет по центру, поверх всех слоёв",
+    build: (v) => act(sceneTransition, { title, kind, duration: v.duration, side: v.side, amount: v.amount, motionBlur: v.motionBlur }),
+  };
+}
+
+export const SCENE_TRANSITIONS: Preset[] = [
+  scene("dip", "Через чёрное", "Затемнение и проявление", "dip"),
+  scene("flash", "Вспышка", "Белая вспышка на склейке", "flash"),
+  scene("blurCut", "Размытие", "Расфокус через склейку", "blur", [], 60),
+  scene("zoomIn", "Зум вперёд", "Проезд камерой сквозь кадр", "zoomIn"),
+  scene("zoomOut", "Зум назад", "Отъезд с рывком", "zoomOut"),
+  scene("whipCut", "Хлыст-панорама", "Резкая панорама с размытием", "whip", [{ ...SIDE, label: "Куда", value: "left" } as Ctl]),
+  scene("spinCut", "Поворот", "Закрутка через склейку", "spin"),
+];
+
+/** Переходы пользователя из библиотеки: папки, в названии которых есть «переход» / «transition». */
+export function libraryTransitions(items: LibItem[]): Preset[] {
+  return items
+    .filter((it) => /переход|transition/i.test(it.category) && (it.kind === "template" || it.kind === "preset"))
+    .map((it) => ({
+      id: `lib:${it.path}`, title: it.name, subtitle: it.kind === "template" ? "Шаблон из библиотеки" : "Пресет из библиотеки", group: "Мои переходы",
+      controls: [],
+      preview: () => (it.preview ? { kind: "media" as const, path: it.preview } : { kind: "cut" as const, length: 1, pose: (i: number, t: number) => scenePose("zoomIn", { duration: 1, amount: 100 }, i, t) }),
+      hint: () => (it.kind === "template" ? "Маркер в шаблоне встанет на текущее время (склейку)" : "На выделенные слои или новый корректирующий слой"),
+      build: () => act(libImport, { item: it }),
+    }));
+}

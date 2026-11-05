@@ -18,3 +18,4 @@ export const IconStar = I(<path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8L12 16.9 6
 export const IconDownload = I(<><path d="M12 4v11M7 10l5 5 5-5" /><path d="M5 20h14" /></>);
 export const IconLayers = I(<><rect x="3" y="7" width="12" height="12" rx="3" /><path d="M8 4h9a3 3 0 0 1 3 3v9" /></>);
 export const IconWave = I(<path d="M2 12h3l2-6 4 12 3-9 2 3h6" />);
+export const IconFolder = I(<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />);
