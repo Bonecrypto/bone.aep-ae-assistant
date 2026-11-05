@@ -30,6 +30,7 @@ export type Prefs = {
   usage: Record<string, { n: number; last: number }>;
   lastValues: Record<string, Record<string, any>>;
   dock: boolean;
+  animControl: "marker" | "keys";
 };
 
 const defaults: Prefs = {
@@ -59,6 +60,7 @@ const defaults: Prefs = {
   usage: {},
   lastValues: {},
   dock: true,
+  animControl: "marker",
 };
 
 const KEY = "aea.prefs.v1";

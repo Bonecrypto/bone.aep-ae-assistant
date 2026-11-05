@@ -25,42 +25,53 @@ function evalExpr(code, env) {
 }
 const sliders = (controls, tag = "1") => Object.fromEntries(controls.map((c) => [c.name.split("@@").join(tag), c.value]));
 
-test("текст: каждая единица от 100% (спрятана) к 0% по очереди, для всех пресетов и порядков", () => {
+const MKDEF = "function MK(n) { var m = thisLayer.marker; for (var k = m.numKeys; k >= 1; k--) { if (m.key(k).comment == n) return m.key(k); } return null; }";
+const layerWith = (marks) => ({ marker: { numKeys: marks.length, key: (k) => marks[k - 1] } });
+
+test("текст: время — от маркера; каждая единица от 100% (спрятана) к 0%, для всех пресетов и порядков", () => {
   for (const p of TABS_PRESETS.text.presets.filter((x) => x.build)) {
     for (const order of ["forward", "reverse", "center", "random"]) {
       for (const mode of ["in", "out"]) {
         const v = { ...defaults(p), order, mode };
         const a = p.build(v).input;
-        const fx = sliders(a.controls); fx["Текст1 · старт"] = 0.2;
+        assert.ok(a.marker && a.marker.duration > 0, `${p.id}: есть маркер`);
+        const fx = sliders(a.controls);
         const code = a.code.split("@@").join("1");
-        const amount = (time, idx) => evalExpr(code, { effect: (n) => () => { if (!(n in fx)) throw new Error("нет " + n); return fx[n]; }, time, inPoint: 0, textIndex: idx, textTotal: 5 })[0];
-        const start = amount(0, 1), end = amount(20, 3);
-        assert.ok(Math.abs((mode === "in" ? start : end) - 100) < 1e-6, `${p.id}/${order}/${mode}: спрятан`);
-        assert.ok(Math.abs(mode === "in" ? end : start) < 1e-6, `${p.id}/${order}/${mode}: виден`);
+        const mk = { comment: a.marker.name.split("@@").join("1"), time: 0.2, duration: a.marker.duration };
+        const amount = (time, idx, marks = [mk]) => evalExpr(code, { effect: (n) => () => { if (!(n in fx)) throw new Error("нет " + n); return fx[n]; }, time, inPoint: 0, textIndex: idx, textTotal: 5, thisLayer: layerWith(marks) })[0];
+        const start = amount(0, 1), end = amount(0.2 + a.marker.duration + 0.01, 5);
+        assert.ok(Math.abs((mode === "in" ? start : end) - 100) < 1e-6, `${p.id}/${order}/${mode}: спрятан (${mode === "in" ? start : end})`);
+        assert.ok(Math.abs(mode === "in" ? end : start) < 1e-6, `${p.id}/${order}/${mode}: виден к концу маркера (${mode === "in" ? end : start})`);
+        assert.equal(amount(0.5, 2, []), 0, `${p.id}: маркер удалён — текст виден`);
       }
     }
   }
 });
 
-test("текст: по порядку вторая буква стартует позже первой", () => {
+test("текст: последняя буква заканчивает ровно к концу маркера; растянули маркер — анимация длиннее", () => {
   const p = TABS_PRESETS.text.presets.find((x) => x.id === "slide");
-  const a = p.build({ ...defaults(p), step: 0.1, duration: 0.5 }).input;
-  const fx = { ...sliders(a.controls), "Текст1 · старт": 0 };
-  const amt = (i) => evalExpr(a.code.split("@@").join("1"), { effect: (n) => () => fx[n], time: 0.1, inPoint: 0, textIndex: i, textTotal: 5 })[0];
-  assert.ok(amt(1) < amt(2));
+  const a = p.build({ ...defaults(p), total: 1, soft: 40 }).input;
+  const code = a.code.split("@@").join("1"), name = a.marker.name.split("@@").join("1");
+  const amt = (time, i, dur = 1) => evalExpr(code, { effect: () => () => 40, time, inPoint: 0, textIndex: i, textTotal: 5, thisLayer: layerWith([{ comment: name, time: 0, duration: dur }]) })[0];
+  assert.ok(amt(0.1, 1) < amt(0.1, 2), "вторая позже первой");
+  assert.ok(amt(0.99, 5) > 0 && Math.abs(amt(1.0, 5)) < 1e-9, "последняя ровно к концу");
+  assert.ok(amt(1.0, 5, 2) > 0, "маркер 2 с — в 1 с ещё идёт");
 });
 
-test("тряска: до удара значение не меняется, после — затухает к нулю", () => {
+test("тряска: до маркера без изменений, после — затухает к концу маркера", () => {
   for (const p of TABS_PRESETS.shakes.presets) {
     const a = p.build(defaults(p)).input;
-    const fx = { ...sliders(a.controls), "Тряска1 · старт": 1 };
+    assert.equal(a.chain, true);
+    const fx = sliders(a.controls);
+    const mk = { comment: a.marker.name.split("@@").join("1"), time: 1, duration: a.marker.duration };
     for (const it of a.items) {
       const value = it.path[1] === "ADBE Position" ? [960, 540] : it.path[1] === "ADBE Scale" ? [100, 100, 100] : 0;
-      const run = (time) => evalExpr(it.code.split("@@").join("1"), { effect: (n) => () => { if (!(n in fx)) throw new Error("нет " + n); return fx[n]; }, time, inPoint: 0, value });
+      const body = it.code.split("@@").join("1");
+      const run = (time) => evalExpr(`${MKDEF}\n(function (value) {\n${body}\n})(value)`, { effect: (n) => () => { if (!(n in fx)) throw new Error("нет " + n); return fx[n]; }, time, value, thisLayer: layerWith([mk]) });
       assert.deepEqual(run(0.5), value, `${p.id} ${it.path[1]}: до удара`);
-      const late = run(30);
-      assert.ok(JSON.stringify(late) === JSON.stringify(value) || Math.abs([].concat(late)[0] - [].concat(value)[0]) < 1e-3, `${p.id}: затухло`);
       assert.notDeepEqual(run(1.07), value, `${p.id} ${it.path[1]}: трясёт`);
+      const late = [].concat(run(1 + mk.duration * 2)), v0 = [].concat(value);
+      assert.ok(late.every((x, i) => Math.abs(x - v0[i]) < 0.05 * Math.max(1, fx[Object.keys(fx).find((k) => k.includes("сила"))] / 10)), `${p.id}: затухло к концу маркера`);
     }
   }
 });

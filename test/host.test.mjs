@@ -2,6 +2,14 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { makeContext, plain, PVT } from "./ae-mock.mjs";
 
+// Мини-движок выражений AE для проверки сгенерированного кода.
+const op = (f) => (a, b) => (Array.isArray(a) ? a.map((x, i) => f(x, Array.isArray(b) ? b[i] : b)) : f(a, b));
+function evalExpr(code, env) {
+  const all = { add: op((a, b) => a + b), sub: op((a, b) => a - b), mul: op((a, b) => a * b), ...env };
+  return new Function(...Object.keys(all), `return eval(${JSON.stringify(code)})`)(...Object.values(all));
+}
+const markersOf = (layer) => { const m = layer.property("ADBE Marker"); return { numKeys: m.keys.length, key: (k) => ({ time: m.keys[k - 1].t, duration: m.keys[k - 1].v.duration, comment: m.keys[k - 1].v.comment }) }; };
+
 const one = (opts) => {
   const h = makeContext([]);
   const l = h.comp.attach(new h.Layer(opts));
@@ -325,6 +333,44 @@ test("переход на склейке: слой по центру склей�
   const l = h.comp.layer(1);
   assert.equal(l.adjustmentLayer, true); assert.ok(Math.abs(l.inPoint - 0.7) < 1e-9 && Math.abs(l.outPoint - 1.3) < 1e-9);
   const tf = l.property("ADBE Effect Parade").property(2);
-  assert.deepEqual(tf.property(4).keys.map((k) => Math.round(k.v)), [100, 300, 33, 100]);
+  assert.equal(tf.property(4).keys.length, 0, "без ключей — от краёв слоя");
+  const sc = (time) => evalExpr(tf.property(4).expression, { time, inPoint: l.inPoint, outPoint: l.outPoint, value: 100 });
+  assert.equal(Math.round(sc(0.7)), 100); assert.ok(sc(0.99) > 250, "к склейке разгоняется до 300"); assert.ok(sc(1.0) < 40, "после склейки с 33"); assert.equal(Math.round(sc(1.3)), 100);
   for (const kind of ["dip", "flash", "blur", "zoomOut", "spin", "whip"]) assert.equal(h.run("ae.sceneTransition", { kind, side: "left" }).ok, true, kind);
+});
+
+
+test("маркер: переход слоя без ключей, длительность = маркер; появление + исчезание складываются в цепочку", () => {
+  const { run, l, tr } = one();
+  const hidden = "(1 - (1 - Math.pow(1 - p, 3)))";
+  run("ae.motion", { mode: "in", duration: 0.5, fade: true, scaleFrom: 0, control: "marker", markerName: "Появление · Выпрыгивание @@", hidden });
+  l.property("ADBE Marker"); // маркер стоит в текущем времени (1 с)
+  const ms = l.property("ADBE Marker").keys;
+  assert.equal(ms.length, 1); assert.equal(ms[0].t, 1); assert.equal(ms[0].v.duration, 0.5); assert.equal(ms[0].v.comment, "Появление · Выпрыгивание 1");
+  assert.equal(tr.property("ADBE Scale").keys.length, 0);
+  const comp = l.comp; comp.time = 3;
+  run("ae.motion", { mode: "out", duration: 1, fade: true, control: "marker", markerName: "Исчезание · Затухание @@", hidden: "(function (p) { return 1 - (1 - Math.pow(1 - p, 3)); })(1 - p)" });
+  const op = tr.property("ADBE Opacity").expression;
+  assert.match(op, /A_2\(A_1\(value\)\)$/);
+  const opac = (time) => evalExpr(op, { time, value: 100, thisLayer: { marker: markersOf(l) } });
+  assert.equal(opac(0.5), 0, "до появления спрятан, как с ключами"); assert.equal(opac(1), 0, "в начале появления спрятан");
+  assert.equal(opac(2), 100, "между анимациями виден"); assert.ok(opac(3.5) < 100 && opac(3.5) > 0); assert.equal(Math.round(opac(4.2)), 0, "после исчезания спрятан");
+  // тянем конец маркера — меняется длительность
+  ms[0].v.duration = 2;
+  assert.ok(opac(2) < 100, "маркер растянули — появление ещё идёт");
+  // удалили маркер — анимации нет
+  l.property("ADBE Marker").keys.splice(0, 1);
+  assert.equal(opac(1), 100);
+});
+
+test("маркер: текст и тряска ставят маркер с длительностью", () => {
+  const h = makeContext([]);
+  const t = h.comp.attach(h.makeText("T", { text: "ab" }));
+  h.run("ae.textFx", { unit: "chars", props: { opacity: 0 }, code: 'MK("Появление · X @@")', controls: [{ name: "Текст@@ · плавность", value: 40 }], marker: { name: "Появление · X @@", duration: 1.5 }, animatorName: "X" });
+  const m = t.property("ADBE Marker").keys[0];
+  assert.equal(m.v.comment, "Появление · X 1"); assert.equal(m.v.duration, 1.5);
+  const sel = t.property("ADBE Text Properties").property("ADBE Text Animators").property(1).property("ADBE Text Selectors").property(1);
+  assert.equal(sel.property("ADBE Text Expressible Amount").expression, 'MK("Появление · X 1")');
+  const r = h.run("ae.expressions", { chain: true, marker: { name: "Удар @@", duration: 0.8 }, items: [{ path: ["ADBE Transform Group", "ADBE Position"], code: "return value;" }], controls: [] });
+  assert.equal(r.ok, true);
 });

@@ -8,6 +8,7 @@
    *   props: { opacity, position: [x, y], scale: %, rotation, blur, skew, tracking },   «спрятанное» состояние
    *   code: "...",  controls: [{ name, value }],   в коде и именах "@@" заменяется на номер аниматора
    *   startSlider: "...",                          имя ползунка старта: ставится = CTI - inPoint
+   *   marker: { name, duration },                  маркер слоя с длительностью: начало и длина всей анимации
    *   animatorName, undoName
    * }
    */
@@ -45,7 +46,7 @@
         var layer = texts[i];
         if (layer.locked) continue;
         var animators = layer.property("ADBE Text Properties").property("ADBE Text Animators");
-        var tag = String(animators.numProperties + 1);
+        var tag = args.marker ? nextTag(layer) : String(animators.numProperties + 1);
         var anim = animators.addProperty("ADBE Text Animator");
         if (args.animatorName) anim.name = args.animatorName + " #" + tag;
 
@@ -67,6 +68,7 @@
 
         var sel = anim.property("ADBE Text Selectors").addProperty("ADBE Text Expressible Selector");
         if (!setBasedOn(sel, args.unit)) unitSet = args.unit === "chars";
+        if (args.marker) addLayerMarker(layer, comp.time, args.marker.duration, args.marker.name.split("@@").join(tag));
         var amount = findByMatch(sel, /Amount/);
         if (amount) {
           amount.expression = args.code.split("@@").join(tag);

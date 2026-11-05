@@ -18,13 +18,13 @@ export const style = hostTool<StyleArgs>({
   done: (r, i) => `${i.title}: ${layersWord(Number(r.changed))}${Number(r.failedParams) ? ` (не все параметры приняты: ${r.failedParams})` : ""}.${undoHint}`,
 });
 
-export const multiExpr = hostTool<{ title: string; items: { path: string[]; code: string }[]; controls: { type?: string; name: string; value: number }[]; startSlider?: string }>({
+export const multiExpr = hostTool<{ title: string; items: { path: string[]; code: string }[]; controls: { type?: string; name: string; value: number }[]; startSlider?: string; chain?: boolean; marker?: { name: string; duration: number } }>({
   name: "ae.expressions",
   title: (i) => i.title ?? "Выражения",
   description: "Внутренний инструмент: несколько выражений одним действием.",
   inputSchema: { type: "object", properties: {} },
   mutates: true,
-  toArgs: (i) => ({ items: i.items, controls: i.controls, startSlider: i.startSlider }),
+  toArgs: (i) => ({ items: i.items, controls: i.controls, startSlider: i.startSlider, chain: i.chain, marker: i.marker }),
   done: (r, i) => {
     const err = String(r.expressionError ?? "");
     return err ? `${i.title}: AE сообщает об ошибке в выражении: ${err}` : `${i.title}: ${layersWord(Number(r.changed))}.${undoHint}`;

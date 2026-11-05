@@ -7,6 +7,7 @@ export const PT = { PROPERTY: 6812, INDEXED_GROUP: 6813, NAMED_GROUP: 6814 };
 const LINEAR = 6612, BEZIER = 6613;
 
 export class KeyframeEase { constructor(speed, influence) { if (influence < 0.1 || influence > 100) throw new Error("influence out of range"); this.speed = speed; this.influence = influence; } }
+export class MarkerValue { constructor(comment) { this.comment = comment; this.duration = 0; this.label = 0; } }
 export class Shape { constructor() { this.vertices = []; this.inTangents = []; this.outTangents = []; this.closed = true; } }
 
 const dimsFor = (t) => (t === PVT.TwoD ? 2 : t === PVT.ThreeD ? 3 : 1);
@@ -68,7 +69,7 @@ const effectFactory = (m) => () => new Group(m,
   m === "ADBE Drop Shadow" ? [new Prop("Color", [0, 0, 0, 1], PVT.COLOR), new Prop("Opacity", 127), new Prop("Direction", 135), new Prop("Distance", 5), new Prop("Softness", 0)]
   : m === "ADBE Geometry2" ? [new Prop("Anchor", [960, 540], PVT.TwoD_SPATIAL), new Prop("Position", [960, 540], PVT.TwoD_SPATIAL), ...many(10)]
   : m === "ADBE Tile" ? many(8) : m === "ADBE Gaussian Blur 2" ? many(3) : [new Prop(m + " value", 0)]);
-const EFFECTS = ["ADBE Geometry2", "ADBE Tile", "ADBE Gaussian Blur 2", "ADBE Slider Control", "ADBE Checkbox Control", "ADBE Layer Control", "ADBE Angle Control", "ADBE Glo2", "ADBE Gaussian Blur 2", "ADBE Tint", "ADBE Fill", "ADBE Drop Shadow"];
+const EFFECTS = ["CC Light Sweep", "ADBE Noise", "ADBE Black&White", "ADBE CurvesCustom", "ADBE HUE SATURATION", "ADBE Geometry2", "ADBE Tile", "ADBE Gaussian Blur 2", "ADBE Slider Control", "ADBE Checkbox Control", "ADBE Layer Control", "ADBE Angle Control", "ADBE Glo2", "ADBE Gaussian Blur 2", "ADBE Tint", "ADBE Fill", "ADBE Drop Shadow"];
 
 function transform(pos) {
   const p = new Prop("Position", [...pos], PVT.TwoD_SPATIAL, "ADBE Position");
@@ -83,7 +84,7 @@ function transform(pos) {
 export class Layer {
   constructor({ name = "Слой", pos = [960, 540], locked = false, rect = { left: -100, top: -50, width: 200, height: 100 } } = {}) {
     Object.assign(this, { name, locked, rect, parent: null, threeDLayer: false, selected: true, label: 0, startTime: 0, inPoint: 0, outPoint: 10, nullLayer: false, adjustmentLayer: false, hasVideo: true, hasAudio: false, source: null });
-    this.groups = { "ADBE Transform Group": transform(pos), "ADBE Effect Parade": new Group("ADBE Effect Parade", [], { addable: Object.fromEntries(EFFECTS.map((m) => [m, effectFactory(m)])) }) };
+    this.groups = { "ADBE Marker": Object.assign(new Prop("Marker", null, PVT.NO_VALUE, "ADBE Marker"), { canSetExpression: false }), "ADBE Transform Group": transform(pos), "ADBE Effect Parade": new Group("ADBE Effect Parade", [], { addable: Object.fromEntries(EFFECTS.map((m) => [m, effectFactory(m)])) }) };
     this.selectedProperties = [];
   }
   property(n) { return this.groups[n] ?? null; }
@@ -160,7 +161,7 @@ export function makeContext(activeItem) {
   }
 
   const ctx = {
-    CompItem, AVLayer, TextLayer, ShapeLayer, CameraLayer, LightLayer, SolidSource, KeyframeEase, Shape,
+    CompItem, AVLayer, TextLayer, ShapeLayer, CameraLayer, LightLayer, SolidSource, KeyframeEase, Shape, MarkerValue,
     FolderItem, FootageItem, File, Folder, ImportOptions, ImportAsType: { PROJECT: 1, FOOTAGE: 2 },
     PropertyValueType: PVT, PropertyType: PT,
     KeyframeInterpolationType: { LINEAR, BEZIER, HOLD: 6614 },

@@ -12,6 +12,9 @@ export type MotionInput = {
   scaleFrom?: number | null;
   rotateFrom?: number | null;
   blurFrom?: number | null;
+  control?: "keys" | "marker";
+  markerName?: string;
+  hidden?: string;
 };
 
 export const motion = hostTool<MotionInput>({

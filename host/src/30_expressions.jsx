@@ -114,7 +114,9 @@
 
   /*
    * ae.expressions — несколько выражений за одно действие (например, тряска: позиция + поворот + масштаб).
-   * args: { items: [{ path: [...], code }], controls: [{ type, name, value }], startSlider, undoName }
+   * args: { items: [{ path: [...], code }], controls: [{ type, name, value }], startSlider, undoName,
+   *         chain: true — code это тело функции (с return), добавляется в цепочку выражений свойства,
+   *         marker: { name, duration } — маркер слоя с длительностью от текущего времени }
    * В именах и коде "@@" заменяется на номер, чтобы повторное применение не путало ползунки.
    */
   tools["ae.expressions"] = function (args) {
@@ -128,7 +130,7 @@
         var layer = layers[i];
         if (layer.locked) continue;
         var fx = layer.property("ADBE Effect Parade");
-        var tag = String(fx ? fx.numProperties + 1 : 1);
+        var tag = args.marker ? nextTag(layer) : String(fx ? fx.numProperties + 1 : 1);
         var controls = args.controls || [];
         for (var c = 0; c < controls.length; c++) {
           var value = controls[c].name === args.startSlider ? comp.time - layer.inPoint : controls[c].value;
@@ -139,11 +141,18 @@
           var p = propByPath(layer, args.items[k].path);
           if (!p || !p.canSetExpression) continue;
           if (p.dimensionsSeparated) { separated++; continue; }
-          p.expression = args.items[k].code.split("@@").join(tag);
-          p.expressionEnabled = true;
-          if (p.expressionError) errors.push(p.expressionError);
+          var code = args.items[k].code.split("@@").join(tag);
+          if (args.chain) {
+            var err = chainExpression(p, code);
+            if (err) errors.push(err);
+          } else {
+            p.expression = code;
+            p.expressionEnabled = true;
+            if (p.expressionError) errors.push(p.expressionError);
+          }
           did = true;
         }
+        if (did && args.marker) addLayerMarker(layer, comp.time, args.marker.duration, args.marker.name.split("@@").join(tag));
         if (did) changed++;
       }
     });

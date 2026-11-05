@@ -6,6 +6,9 @@ import { openUrl } from "../lib/cep";
 import { setPrefs, setStatus, usePrefs } from "../lib/store";
 import { canSelfUpdate, fetchReleases, installRelease, isCurrent, isNewer, type Release } from "../lib/update";
 import { Btn, Row, Seg } from "../ui/ui";
+import { clearLog, getLog, report } from "../lib/errorlog";
+import { copyText } from "../lib/clipboard";
+import { callHost } from "../lib/cep";
 
 const ACCENTS = ["#9f18ec", "#0a84ff", "#ff6b2c", "#e0245e", "#30b06f", "#6e5cff", "#c8a24a"];
 
@@ -61,6 +64,19 @@ export function SettingsSection() {
           <span className="switch" /> Панель быстрого доступа слева
         </label>
       </div>
+
+      <div className="panel">
+        <div className="panel-title">Как ставить анимации</div>
+        <Seg value={p.animControl} onChange={(v) => setPrefs({ animControl: v })} options={[
+          { value: "marker", label: "Маркер с длительностью", hint: "На слое появляется маркер-полоса: двигаешь — сдвигается, тянешь конец — меняется длительность, удаляешь — анимации нет" },
+          { value: "keys", label: "Ключи", hint: "Обычные ключевые кадры — можно править график скорости" },
+        ]} />
+        <div className="panel-hint">
+          {p.animControl === "marker"
+            ? "Переходы слоёв, текст и тряска управляются маркером на слое. Переходы между сценами — краями своего слоя."
+            : "Переходы слоёв ставятся ключами. Текст и тряска всё равно управляются маркером."}
+        </div>
+      </div>
       <div className="panel">
         <div className="panel-title">ИИ-модель для чата</div>
         <Seg value={p.chatProvider} onChange={(v: ProviderId) => setPrefs({ chatProvider: v, chatModel: "", chatBaseUrl: "" })}
@@ -84,6 +100,8 @@ export function SettingsSection() {
         <div className="panel-hint small">Ключ хранится только в этой панели на вашем компьютере. Сейчас: {chatConfig().baseUrl || "адрес не задан"}</div>
       </div>
 
+      <ErrorLog />
+
       <div className="panel">
         <div className="panel-title">Обновления</div>
         <div className="panel-hint">Версия {VERSION}{BUILD ? `, сборка ${BUILD}` : " (локальная сборка)"}</div>
@@ -104,5 +122,26 @@ export function SettingsSection() {
         )}
       </div>
     </section>
+  );
+}
+
+/** Журнал ошибок: последние неудачные действия с параметрами и ответом AE — копируется одной кнопкой. */
+function ErrorLog() {
+  const [, setTick] = useState(0);
+  const log = getLog();
+  const copy = async () => {
+    const r = await callHost("system.ping");
+    copyText(report(r.ok ? String(r.appVersion) : "нет связи"));
+  };
+  return (
+    <div className="panel">
+      <div className="panel-title">Журнал ошибок <span className="hint">· {log.length ? `${log.length} записей` : "пусто"}</span></div>
+      {log.slice(0, 4).map((e, i) => <div key={i} className="log-row" title={`${e.args}${e.host ? `\nAE: ${e.host}` : ""}`}><em>{e.at.slice(11)}</em> {e.tool}: {e.message}</div>)}
+      <div className="panel-hint small">Если что-то не работает — нажмите «Скопировать отчёт» и пришлите текст разработчику.</div>
+      <Row between>
+        <button className="link" onClick={() => { clearLog(); setTick((t) => t + 1); }}>Очистить</button>
+        <Btn onClick={copy}>Скопировать отчёт</Btn>
+      </Row>
+    </div>
   );
 }

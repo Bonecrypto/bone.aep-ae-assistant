@@ -6,7 +6,10 @@
    *   fade: bool,
    *   move: { dir: откуда приходит слой "left"|"right"|"up"|"down", distance: px (0 = из-за края кадра) } | null,
    *   scaleFrom: % | null,  rotateFrom: deg | null,  blurFrom: px | null,
-   *   blurName: "...", undoName
+   *   blurName: "...", undoName,
+   *   control: "keys" | "marker",   marker — без ключей: выражения + маркер слоя с длительностью
+   *   markerName: "...@@",          текст маркера, @@ -> номер
+   *   hidden: "...",                выражение «насколько спрятан» от p (0..1) — кривая из панели
    * }
    * Каждое свойство: «спрятанное» значение <-> текущее, ключи от CTI (+ i * stagger).
    */
@@ -28,6 +31,43 @@
     else keyPair(prop, t0, t1, isIn ? off : rest, isIn ? rest : off, isIn ? 15 : 85, isIn ? 85 : 15);
   }
 
+  // Режим маркера: те же «спрятанные» значения, но через выражения, от маркера слоя.
+  function motionByMarker(layer, tr, comp, t0, duration, args, isIn) {
+    var tag = nextTag(layer), name = String(args.markerName || "Anim @@").split("@@").join(tag);
+    var head = "var mk = MK(" + str(name) + ");\nif (!mk) return value;\n" +
+      "var p = Math.min(1, Math.max(0, (time - mk.time) / Math.max(mk.duration, 0.001)));\n" +
+      "var h = " + args.hidden + ";\n";
+    var did = false;
+    if (args.fade) { chainExpression(tr.property("ADBE Opacity"), head + "return value * Math.max(0, 1 - h);"); did = true; }
+    if (args.move) {
+      var horizontal = args.move.dir === "left" || args.move.dir === "right", axis = horizontal ? 0 : 1;
+      var sign = args.move.dir === "left" || args.move.dir === "up" ? -1 : 1;
+      var pos = tr.property("ADBE Position"), sep = pos.dimensionsSeparated;
+      var mp = sep ? tr.property(horizontal ? "ADBE Position_0" : "ADBE Position_1") : pos;
+      var rest = mp.valueAtTime(t0, false), cur = sep ? rest : rest[axis];
+      var hidden = args.move.distance > 0 ? cur + sign * args.move.distance : offscreen(layer, tr, comp, t0, args.move.dir, cur);
+      var d = hidden - cur;
+      if (sep) chainExpression(mp, head + "return value + " + num(d) + " * h;");
+      else {
+        var off = []; for (var k = 0; k < rest.length; k++) off.push(k === axis ? d : 0);
+        chainExpression(mp, head + "return add(value, mul(" + vec(off) + ", h));");
+      }
+      did = true;
+    }
+    if (args.scaleFrom !== null && args.scaleFrom !== undefined) {
+      chainExpression(tr.property("ADBE Scale"), head + "return mul(value, 1 + (" + num(args.scaleFrom / 100) + " - 1) * h);"); did = true;
+    }
+    if (args.rotateFrom) {
+      chainExpression(tr.property("ADBE Rotate Z"), head + "return value + " + num(isIn ? args.rotateFrom : -args.rotateFrom) + " * h;"); did = true;
+    }
+    if (args.blurFrom > 0) {
+      var bp = blurProp(layer, args.blurName || "Blur");
+      if (bp) { chainExpression(bp, head + "return value + " + num(args.blurFrom) + " * Math.max(0, h);"); did = true; }
+    }
+    if (did) addLayerMarker(layer, t0, duration, name);
+    return did;
+  }
+
   tools["ae.motion"] = function (args) {
     var comp = activeComp();
     if (!comp) return fail("NO_COMP");
@@ -46,6 +86,11 @@
         var tr = layer.property("ADBE Transform Group");
         if (!tr) { skipped.noPosition++; continue; }
         var t0 = comp.time + i * stagger, t1 = t0 + duration, did = false;
+        if (args.control === "marker") {
+          var r = motionByMarker(layer, tr, comp, t0, duration, args, isIn);
+          if (r) changed++; else skipped.expression++;
+          continue;
+        }
 
         if (args.fade) {
           var op = tr.property("ADBE Opacity");

@@ -1,4 +1,5 @@
-import { easeIn, easeOut, type EaseKind } from "../lib/easing";
+import { EASE_EXPR, easeIn, easeOut, type EaseKind } from "../lib/easing";
+import { getPrefs } from "../lib/store";
 import { layersWord } from "../lib/format";
 import { motion, type MotionInput } from "../tools/ae/motion";
 import { sceneTransition, type SceneKind } from "../tools/ae/scene";
@@ -35,6 +36,15 @@ function poseFor(r: ReturnType<Recipe>, v: Values, i: number, t: number): Pose {
   return pose;
 }
 
+/** Режим маркера: насколько слой «спрятан» (h) от прогресса p внутри маркера — та же кривая, что в превью. */
+export function markerArgs(title: string, mode: string, spring: boolean) {
+  if (getPrefs().animControl === "keys") return { control: "keys" as const };
+  const hidden = mode === "out"
+    ? `(function (p) { return 1 - ${EASE_EXPR.smooth}; })(1 - p)`
+    : `(1 - ${EASE_EXPR[spring ? "back" : "smooth"]})`;
+  return { control: "marker" as const, markerName: `${mode === "out" ? "Исчезание" : "Появление"} · ${title} @@`, hidden };
+}
+
 function make(id: string, title: string, subtitle: string, group: string, extra: Ctl[], recipe: Recipe, multi = false): Preset {
   const controls = [DIR_SEG, DUR, ...extra, ...(multi ? [STAG] : [])];
   return {
@@ -44,8 +54,10 @@ function make(id: string, title: string, subtitle: string, group: string, extra:
       const count = multi ? 3 : 1;
       return { kind: "layers", count, label: "Слой", length: v.duration + (count - 1) * (v.stagger ?? 0), pose: (i, t) => poseFor(r, v, i, t) };
     },
-    hint: (_v, sel) => sel.selected ? `${layersWord(sel.selected)} · от текущего времени` : "Выделите слои и поставьте указатель времени",
-    build: (v) => act(motion, { ...recipe(v), title, mode: v.mode, duration: v.duration, stagger: multi ? v.stagger : 0 }),
+    hint: (_v, sel) => sel.selected
+      ? `${layersWord(sel.selected)} · ${getPrefs().animControl === "marker" ? "длительность — маркер на слое, тяните его конец" : "ключами от текущего времени"}`
+      : "Выделите слои и поставьте указатель времени",
+    build: (v) => act(motion, { ...recipe(v), title, mode: v.mode, duration: v.duration, stagger: multi ? v.stagger : 0, ...markerArgs(title, v.mode, !!recipe(v).spring) }),
   };
 }
 
@@ -104,7 +116,7 @@ function scene(id: string, title: string, subtitle: string, kind: SceneKind, ext
     controls: [slider("duration", "Длительность", 0.6, 0.1, 3, 0.05, "с"), ...extra, slider("amount", "Сила", amount, 10, 300, 1, "%"),
       ...(["zoomIn", "zoomOut", "whip", "spin"].includes(kind) ? [{ type: "toggle", key: "motionBlur", label: "Размытие движения", value: true } as Ctl] : [])],
     preview: (v) => ({ kind: "cut", length: v.duration, flash: kind === "flash" ? v.amount / 100 : 0, dip: kind === "dip", pose: (i, t) => scenePose(kind, v, i, t) }),
-    hint: () => "Поставьте время на склейку — переход встанет по центру, поверх всех слоёв",
+    hint: () => "Время на склейку → «Применить». Длительность = длина слоя перехода: тяните его края",
     build: (v) => act(sceneTransition, { title, kind, duration: v.duration, side: v.side, amount: v.amount, motionBlur: v.motionBlur }),
   };
 }

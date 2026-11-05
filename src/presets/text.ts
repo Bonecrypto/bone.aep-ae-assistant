@@ -15,9 +15,8 @@ type Hidden = TextFxArgs["props"];
 const UNIT: Ctl = { type: "seg", key: "unit", label: "По", value: "chars", options: [{ value: "chars", label: "буквам" }, { value: "words", label: "словам" }, { value: "lines", label: "строкам" }] };
 const EASE: Ctl = { type: "seg", key: "ease", label: "Кривая", value: "smooth", options: [{ value: "smooth", label: "Плавно" }, { value: "expo", label: "Резко" }, { value: "back", label: "Пружина" }, { value: "elastic", label: "Резинка" }] };
 const ORDER: Ctl = { type: "seg", key: "order", label: "Порядок", value: "forward", options: [{ value: "forward", label: "→" }, { value: "reverse", label: "←" }, { value: "center", label: "↔" }, { value: "random", label: "?" }] };
-const DUR = slider("duration", "Длительность", 0.5, 0, 3, 0.05, "с");
-const STEP = slider("step", "Шаг", 0.04, 0, 0.5, 0.005, "с");
-
+const TOTAL = slider("total", "Длительность", 1, 0.1, 6, 0.05, "с");
+const SOFT = slider("soft", "Плавность", 40, 0, 100, 1, "%");
 const ORDER_EXPR: Record<string, string> = {
   forward: "",
   reverse: "i = n - 1 - i;",
@@ -25,18 +24,34 @@ const ORDER_EXPR: Record<string, string> = {
   random: "seedRandom(textIndex, true); i = Math.floor(random(n));",
 };
 
-/** Выражение для Amount селектора. "@@" — номер аниматора (подставит AE-часть). */
-function amountCode(v: Values) {
+/*
+ * Выражение для Amount селектора. Время — от маркера слоя: начало маркера = старт, его длина = вся анимация.
+ * Плавность F — доля этого времени, за которую проявляется одна единица; остальное — сдвиг между единицами.
+ * Маркер удалён — текст просто виден. "@@" — номер анимации на слое (подставит AE-часть).
+ */
+const MK = "function MK(n) { var m = thisLayer.marker; for (var k = m.numKeys; k >= 1; k--) { if (m.key(k).comment == n) return m.key(k); } return null; }";
+
+function amountCode(v: Values, markerName: string) {
   const ease = EASE_EXPR[(v.ease as EaseKind) ?? "smooth"];
-  return `// AE Assistant — текст по ${v.unit === "words" ? "словам" : v.unit === "lines" ? "строкам" : "буквам"}
-var S = effect("Текст@@ · старт")(1);
-var D = Math.max(effect("Текст@@ · длительность")(1), 0.001);
-var G = effect("Текст@@ · шаг")(1);
-var n = textTotal, i = textIndex - 1;
-${ORDER_EXPR[v.order] ?? ""}
-var p = Math.min(1, Math.max(0, (time - inPoint - S - i * G) / D));
-${v.mode === "out" ? "p = 1 - p;\n" : ""}var a = 100 * (1 - (${ease}));
-[a, a, a]`;
+  return `// AE Assistant — текст по ${v.unit === "words" ? "словам" : v.unit === "lines" ? "строкам" : "буквам"}, время = маркер «${markerName}»
+${MK}
+var mk = MK(${JSON.stringify(markerName)});
+if (!mk) { [0, 0, 0]; } else {
+  var T = Math.max(mk.duration, 0.001), F = Math.min(1, Math.max(0, effect("Текст@@ · плавность")(1) / 100));
+  var n = textTotal, i = textIndex - 1;
+  ${ORDER_EXPR[v.order] ?? ""}
+  var D = Math.max(T * F, 0.001), G = n > 1 ? (T - T * F) / (n - 1) : 0;
+  var p = Math.min(1, Math.max(0, (time - mk.time - i * G) / D));
+  ${v.mode === "out" ? "p = 1 - p;" : ""}
+  var a = 100 * (1 - (${ease}));
+  [a, a, a];
+}`;
+}
+
+/** Время одной единицы в превью — те же формулы, что в выражении. */
+function unitTiming(v: Values, n: number) {
+  const T = Math.max(v.total, 0.001), F = Math.min(1, Math.max(0, v.soft / 100));
+  return { D: Math.max(T * F, 0.001), G: n > 1 ? (T - T * F) / (n - 1) : 0, T };
 }
 
 function previewIndex(order: string, i: number, n: number) {
@@ -46,20 +61,22 @@ function previewIndex(order: string, i: number, n: number) {
   return i;
 }
 
+const markerFor = (title: string, mode: string, tag: string) => `${mode === "out" ? "Исчезание" : "Появление"} · ${title} ${tag}`;
+
 function make(id: string, title: string, subtitle: string, extra: Ctl[], hidden: (v: Values) => Hidden, init: Partial<Record<string, any>> = {}): Preset {
-  const controls = [DIR_SEG, UNIT, EASE, DUR, STEP, ...extra, ORDER].map((c) => (c.key in init ? { ...c, value: init[c.key] } : c)) as Ctl[];
+  const controls = [DIR_SEG, UNIT, EASE, TOTAL, SOFT, ...extra, ORDER].map((c) => (c.key in init ? { ...c, value: init[c.key] } : c)) as Ctl[];
   return {
     id, title, subtitle, group: "Появление и исчезание", controls,
-    code: amountCode,
+    code: (v) => amountCode(v, markerFor(title, v.mode, "@@")),
     preview: (v) => {
       const h = hidden(v);
       const text = v.unit === "lines" ? "Анимация\nтекста" : "Анимация текста";
       return {
         kind: "text", text, unit: v.unit,
-        length: v.duration + (v.unit === "chars" ? 14 : v.unit === "words" ? 1 : 1) * v.step + 0.1,
+        length: v.total + 0.1,
         pose: (i, n, t): Pose => {
-          const k = previewIndex(v.order, i, n);
-          let p = Math.min(1, Math.max(0, (t - k * v.step) / Math.max(v.duration, 0.001)));
+          const k = previewIndex(v.order, i, n), { D, G } = unitTiming(v, n);
+          let p = Math.min(1, Math.max(0, (t - k * G) / D));
           if (v.mode === "out") p = 1 - p;
           const a = 1 - easeOut(v.ease, p); // доля «спрятанности», может уходить за 0 (перелёт)
           return {
@@ -74,11 +91,15 @@ function make(id: string, title: string, subtitle: string, extra: Ctl[], hidden:
         },
       };
     },
-    hint: (_v, sel) => sel.text ? `${sel.text} ${plural(sel.text, "текстовый слой", "текстовых слоя", "текстовых слоёв")} · от текущего времени` : "Выделите текстовый слой",
-    build: (v) => act(textFx, {
-      title, unit: v.unit, props: hidden(v), code: amountCode(v), startSlider: "Текст@@ · старт",
-      controls: [{ name: "Текст@@ · старт", value: 0 }, { name: "Текст@@ · длительность", value: v.duration }, { name: "Текст@@ · шаг", value: v.step }],
-    }),
+    hint: (_v, sel) => sel.text ? `${sel.text} ${plural(sel.text, "текстовый слой", "текстовых слоя", "текстовых слоёв")} · длительность — маркер на слое, тяните его конец` : "Выделите текстовый слой",
+    build: (v) => {
+      const name = markerFor(title, v.mode, "@@");
+      return act(textFx, {
+        title, unit: v.unit, props: hidden(v), code: amountCode(v, name), startSlider: "",
+        controls: [{ name: "Текст@@ · плавность", value: v.soft }],
+        marker: { name, duration: v.total },
+      });
+    },
   };
 }
 
@@ -88,20 +109,20 @@ const scale = (v = 60) => slider("scale", "Масштаб в начале", v, 0
 const rot = (v = 90) => slider("rotation", "Поворот", v, -360, 360, 5, "°");
 
 export const TEXT_PRESETS: Preset[] = [
-  make("hero", "Главный титр", "Масштаб, размытие и проявление", [blur(12), scale(60)], (v) => ({ opacity: 0, scale: v.scale, blur: v.blur }), { duration: 0.8, step: 0.03 }),
-  make("rise", "Подъём по словам", "Снизу с проявлением", [dist(40)], (v) => ({ opacity: 0, position: [0, v.distance] }), { unit: "words", step: 0.08, duration: 0.6 }),
+  make("hero", "Главный титр", "Масштаб, размытие и проявление", [blur(12), scale(60)], (v) => ({ opacity: 0, scale: v.scale, blur: v.blur }), { total: 1.2, soft: 60 }),
+  make("rise", "Подъём по словам", "Снизу с проявлением", [dist(40)], (v) => ({ opacity: 0, position: [0, v.distance] }), { unit: "words", total: 1, soft: 60 }),
   make("slide", "Сдвиг", "Буквы приезжают сбоку", [dist(60)], (v) => ({ opacity: 0, position: [-v.distance, 0] })),
-  make("pop", "Пружинный масштаб", "Буквы выпрыгивают", [scale(0)], (v) => ({ opacity: 0, scale: v.scale }), { ease: "back" }),
+  make("pop", "Пружинный масштаб", "Буквы выпрыгивают", [scale(0)], (v) => ({ opacity: 0, scale: v.scale }), { ease: "back", total: 1, soft: 45 }),
   make("letters", "Буквы с подъёмом", "Сдвиг и масштаб по буквам", [dist(30), scale(50)], (v) => ({ opacity: 0, position: [0, v.distance], scale: v.scale }), { ease: "back" }),
-  make("wordBounce", "Слова пружиной", "Масштаб по словам с резинкой", [scale(0)], (v) => ({ opacity: 0, scale: v.scale }), { unit: "words", ease: "elastic", duration: 0.9, step: 0.1 }),
-  make("blurIn", "Из размытия", "Проявление из расфокуса", [blur(20)], (v) => ({ opacity: 0, blur: v.blur }), { duration: 0.7 }),
-  make("burst", "Взрыв", "Крупно и размыто, вразброс", [scale(300), blur(30)], (v) => ({ opacity: 0, scale: v.scale, blur: v.blur }), { ease: "expo", order: "random", step: 0.02 }),
-  make("typewriter", "Печатная машинка", "Буквы по одной, без плавности", [], () => ({ opacity: 0 }), { duration: 0, step: 0.05 }),
-  make("drop", "Падение букв", "Сверху с отскоком", [dist(60)], (v) => ({ opacity: 0, position: [0, -v.distance] }), { ease: "elastic", duration: 0.8 }),
+  make("wordBounce", "Слова пружиной", "Масштаб по словам с резинкой", [scale(0)], (v) => ({ opacity: 0, scale: v.scale }), { unit: "words", ease: "elastic", total: 1.4, soft: 65 }),
+  make("blurIn", "Из размытия", "Проявление из расфокуса", [blur(20)], (v) => ({ opacity: 0, blur: v.blur }), { total: 1.2, soft: 55 }),
+  make("burst", "Взрыв", "Крупно и размыто, вразброс", [scale(300), blur(30)], (v) => ({ opacity: 0, scale: v.scale, blur: v.blur }), { ease: "expo", order: "random", total: 1, soft: 60 }),
+  make("typewriter", "Печатная машинка", "Буквы по одной, без плавности", [], () => ({ opacity: 0 }), { total: 1.5, soft: 0 }),
+  make("drop", "Падение букв", "Сверху с отскоком", [dist(60)], (v) => ({ opacity: 0, position: [0, -v.distance] }), { ease: "elastic", total: 1.3, soft: 55 }),
   make("rotate", "Поворот букв", "Буквы доворачиваются на место", [rot(90)], (v) => ({ opacity: 0, rotation: v.rotation }), { ease: "back" }),
   make("skew", "Наклонный сдвиг", "Сдвиг с наклоном", [dist(60), slider("skew", "Наклон", 30, -70, 70, 1, "°")], (v) => ({ opacity: 0, position: [-v.distance, 0], skew: v.skew })),
-  make("lines", "Строки снизу", "Строки по очереди", [dist(50)], (v) => ({ opacity: 0, position: [0, v.distance] }), { unit: "lines", step: 0.15, duration: 0.7 }),
-  make("tracking", "Разлёт трекинга", "Буквы съезжаются к центру", [slider("tracking", "Трекинг", 40, 0, 300, 1), blur(8)], (v) => ({ opacity: 0, tracking: v.tracking, blur: v.blur }), { order: "center", step: 0.02 }),
+  make("lines", "Строки снизу", "Строки по очереди", [dist(50)], (v) => ({ opacity: 0, position: [0, v.distance] }), { unit: "lines", total: 1.2, soft: 70 }),
+  make("tracking", "Разлёт трекинга", "Буквы съезжаются к центру", [slider("tracking", "Трекинг", 40, 0, 300, 1), blur(8)], (v) => ({ opacity: 0, tracking: v.tracking, blur: v.blur }), { order: "center", total: 1, soft: 60 }),
 ];
 
 const styleSummary = () => {
