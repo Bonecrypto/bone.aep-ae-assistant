@@ -20,10 +20,14 @@ export type Prefs = {
   chatKey: string;
   chatConfirm: boolean;
   favorites: string[];
+  lastPreset: Record<string, string>;
+  accent: string;
+  theme: "dark" | "light";
+  customCurves: { id: string; title: string; curve: [number, number, number, number] }[];
 };
 
 const defaults: Prefs = {
-  tab: "animate",
+  tab: "transitions",
   animMode: "in",
   duration: 0.6,
   spring: false,
@@ -39,6 +43,10 @@ const defaults: Prefs = {
   chatKey: "",
   chatConfirm: true,
   favorites: [],
+  lastPreset: {},
+  accent: "#9f18ec",
+  theme: "dark",
+  customCurves: [],
 };
 
 const KEY = "aea.prefs.v1";

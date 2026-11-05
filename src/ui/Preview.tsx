@@ -1,0 +1,63 @@
+import { useEffect, useRef, useState, type CSSProperties } from "react";
+import type { Pose, PreviewSpec } from "../presets/types";
+
+const HOLD = 0.9; // пауза после анимации перед повтором, с
+
+const style = (p: Pose): CSSProperties => ({
+  transform: `translate(${p.x ?? 0}px, ${p.y ?? 0}px) scale(${p.s ?? 1}) rotate(${p.r ?? 0}deg) skewX(${p.sk ?? 0}deg)`,
+  opacity: Math.max(0, Math.min(1, p.o ?? 1)),
+  filter: p.b ? `blur(${p.b.toFixed(1)}px)` : undefined,
+});
+
+function split(text: string, unit: "chars" | "words" | "lines") {
+  if (unit === "chars") return [...text];
+  if (unit === "words") return text.split(/(\s+)/).filter((s) => s.length);
+  return text.split("\n");
+}
+
+/** Живое превью: крутится по кругу, «Повтор» начинает заново. */
+export function Preview({ spec, replay }: { spec: PreviewSpec; replay: number }) {
+  const [t, setT] = useState(0);
+  const start = useRef(performance.now());
+  useEffect(() => { start.current = performance.now(); }, [replay, spec]);
+  useEffect(() => {
+    if (spec.kind === "node") return;
+    let raf = 0;
+    const loop = () => {
+      const len = spec.length + HOLD;
+      setT((((performance.now() - start.current) / 1000) % len));
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [spec]);
+
+  if (spec.kind === "node") return <div className="stage">{spec.node}</div>;
+
+  if (spec.kind === "layers") {
+    return (
+      <div className="stage">
+        <div className={`stage-layers n${spec.count}`}>
+          {Array.from({ length: spec.count }, (_, i) => (
+            <div key={i} className="stage-card" style={style(spec.pose(i, t))}>{spec.count === 1 ? spec.label ?? "" : ""}</div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const parts = split(spec.text, spec.unit);
+  let idx = 0;
+  const n = parts.filter((p) => !/^\s+$/.test(p)).length;
+  return (
+    <div className="stage">
+      <div className={`stage-text ${spec.unit}`}>
+        {parts.map((p, k) => {
+          if (/^\s+$/.test(p)) return <span key={k} className="ws">{p}</span>;
+          const i = idx++;
+          return <span key={k} className="unit" style={style(spec.pose(i, n, t))}>{p}</span>;
+        })}
+      </div>
+    </div>
+  );
+}

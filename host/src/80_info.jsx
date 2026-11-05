@@ -40,6 +40,19 @@
     } };
   };
 
+  // Лёгкая сводка для строки состояния (вызывается панелью раз в 1-2 секунды).
+  tools["ae.selectionInfo"] = function () {
+    var comp = activeComp();
+    if (!comp) return { ok: true, comp: null };
+    var sel = comp.selectedLayers, text = 0, keys = 0;
+    for (var i = 0; i < sel.length; i++) {
+      if (sel[i] instanceof TextLayer) text++;
+      var sp = sel[i].selectedProperties;
+      for (var j = 0; j < sp.length; j++) if (sp[j].propertyType === PropertyType.PROPERTY) keys += sp[j].selectedKeys.length;
+    }
+    return { ok: true, comp: comp.name, width: comp.width, height: comp.height, selected: sel.length, text: text, keys: keys };
+  };
+
   tools["system.ping"] = function () {
     return { ok: true, appVersion: app.version, hostVersion: VERSION, hasComp: activeComp() !== null };
   };

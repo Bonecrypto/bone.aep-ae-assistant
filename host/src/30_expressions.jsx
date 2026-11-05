@@ -111,3 +111,42 @@
     if (!changed) return fail("NO_EXPRESSIONS");
     return { ok: true, changed: changed };
   };
+
+  /*
+   * ae.expressions — несколько выражений за одно действие (например, тряска: позиция + поворот + масштаб).
+   * args: { items: [{ path: [...], code }], controls: [{ type, name, value }], startSlider, undoName }
+   * В именах и коде "@@" заменяется на номер, чтобы повторное применение не путало ползунки.
+   */
+  tools["ae.expressions"] = function (args) {
+    var comp = activeComp();
+    if (!comp) return fail("NO_COMP");
+    var layers = selectedLayers(comp);
+    if (!layers.length) return fail("NO_SELECTION");
+    var changed = 0, errors = [];
+    undoable(args.undoName, function () {
+      for (var i = 0; i < layers.length; i++) {
+        var layer = layers[i];
+        if (layer.locked) continue;
+        var fx = layer.property("ADBE Effect Parade");
+        var tag = String(fx ? fx.numProperties + 1 : 1);
+        var controls = args.controls || [];
+        for (var c = 0; c < controls.length; c++) {
+          var value = controls[c].name === args.startSlider ? comp.time - layer.inPoint : controls[c].value;
+          ensureControl(layer, { type: controls[c].type || "slider", name: controls[c].name.split("@@").join(tag), value: value });
+        }
+        var did = false;
+        for (var k = 0; k < args.items.length; k++) {
+          var p = propByPath(layer, args.items[k].path);
+          if (!p || !p.canSetExpression) continue;
+          if (p.dimensionsSeparated) continue;
+          p.expression = args.items[k].code.split("@@").join(tag);
+          p.expressionEnabled = true;
+          if (p.expressionError) errors.push(p.expressionError);
+          did = true;
+        }
+        if (did) changed++;
+      }
+    });
+    if (!changed) return fail("NOTHING_CHANGED", { skipped: { other: layers.length } });
+    return { ok: true, changed: changed, expressionError: errors.length ? errors[0] : "" };
+  };

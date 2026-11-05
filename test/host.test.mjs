@@ -234,3 +234,60 @@ test("отскок: вход в ключи становится линейным
   run("ae.expression", { code: "x", linearIn: true });
   assert.deepEqual(p.keys.map((k) => [k.inI, k.outI]), [[6613, 6613], [6612, 6613], [6612, 6613]]);
 });
+
+// ---------- 0.5: переходы, текст, тряска, стили ----------
+test("ae.motion: несколько свойств, сдвиг между слоями, размытие эффектом", () => {
+  const h = makeContext([]);
+  const a = h.comp.attach(new h.Layer()), b = h.comp.attach(new h.Layer());
+  const r = h.run("ae.motion", { mode: "in", duration: 0.5, stagger: 0.1, fade: true, move: { dir: "down", distance: 80 }, scaleFrom: 60, blurFrom: 20, blurName: "Размытие" });
+  assert.equal(r.changed, 2);
+  const ta = a.property("ADBE Transform Group"), tb = b.property("ADBE Transform Group");
+  assert.deepEqual(plain(ta.property("ADBE Position").keys.map((k) => k.v)), [[960, 620], [960, 540]]);
+  assert.deepEqual(plain(ta.property("ADBE Scale").keys[0].v), [60, 60, 60]);
+  assert.equal(tb.property("ADBE Opacity").keys[0].t, 1.1);
+  const blur = a.property("ADBE Effect Parade").property(1);
+  assert.equal(blur.name, "Размытие"); assert.deepEqual(blur.property(1).keys.map((k) => k.v), [20, 0]);
+  h.run("ae.motion", { mode: "in", blurFrom: 10, blurName: "Размытие" });
+  assert.equal(a.property("ADBE Effect Parade").numProperties, 1, "эффект размытия не дублируется");
+});
+
+test("ae.textFx: аниматор, expression selector по словам, ползунки с номером", () => {
+  const h = makeContext([]);
+  const t = h.comp.attach(h.makeText("T", { text: "раз два" })); t.inPoint = 0.4;
+  const r = h.run("ae.textFx", { unit: "words", props: { opacity: 0, position: [0, 40], scale: 60, blur: 10 }, code: 'effect("Текст@@ · старт")(1)',
+    controls: [{ name: "Текст@@ · старт", value: 0 }, { name: "Текст@@ · шаг", value: 0.05 }], startSlider: "Текст@@ · старт", animatorName: "Подъём" });
+  assert.equal(r.ok, true); assert.equal(r.unitSet, true);
+  const anim = t.property("ADBE Text Properties").property("ADBE Text Animators").property(1);
+  assert.equal(anim.name, "Подъём #1");
+  const sel = anim.property("ADBE Text Selectors").property(1);
+  assert.equal(sel.property("ADBE Text Range Type2").value, 3);
+  assert.equal(sel.property("ADBE Text Expressible Amount").expression, 'effect("Текст1 · старт")(1)');
+  const fx = t.property("ADBE Effect Parade");
+  assert.equal(fx.property(1).name, "Текст1 · старт");
+  assert.ok(Math.abs(fx.property(1).property(1).value - 0.6) < 1e-9, "старт = CTI - inPoint");
+  assert.equal(anim.property("ADBE Text Animator Properties").numProperties, 4);
+});
+
+test("ae.expressions: тряска на несколько свойств одним действием", () => {
+  const { run, tr, undo } = one();
+  const r = run("ae.expressions", { items: [{ path: ["ADBE Transform Group", "ADBE Position"], code: "p@@" }, { path: ["ADBE Transform Group", "ADBE Rotate Z"], code: "r@@" }],
+    controls: [{ name: "Тряска@@ · сила", value: 40 }] });
+  assert.equal(r.changed, 1);
+  assert.equal(tr.property("ADBE Position").expression, "p1"); assert.equal(tr.property("ADBE Rotate Z").expression, "r1");
+  assert.equal(undo.filter((x) => x.startsWith("begin")).length, 1);
+});
+
+test("ae.style: эффект с параметрами и анимированным параметром", () => {
+  const { run, l } = one();
+  const r = run("ae.style", { matchName: "ADBE Drop Shadow", name: "Мягкая тень", params: [{ index: 2, value: 76 }, { index: 4, value: 12 }, { index: 5, value: 35 }], keys: [{ index: 3, from: 0, to: 90, duration: 1 }] });
+  assert.equal(r.ok, true); assert.equal(r.failedParams, 0);
+  const e = l.property("ADBE Effect Parade").property(1);
+  assert.equal(e.name, "Мягкая тень"); assert.equal(e.property(4).value, 12); assert.deepEqual(e.property(3).keys.map((k) => k.v), [0, 90]);
+});
+
+test("ae.selectionInfo", () => {
+  const h = makeContext([]);
+  h.comp.attach(h.makeText("T", { text: "a" })); h.comp.attach(new h.Layer());
+  const r = h.run("ae.selectionInfo", {});
+  assert.equal(r.comp, "Comp 1"); assert.equal(r.selected, 2); assert.equal(r.text, 1);
+});
