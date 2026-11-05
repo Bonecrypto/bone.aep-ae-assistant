@@ -12,7 +12,6 @@ import { EaseSection } from "./sections/Ease";
 import { SettingsSection } from "./sections/Settings";
 import { Browser } from "./ui/Browser";
 import { Palette } from "./ui/Palette";
-import { BrandMark } from "./ui/Brand";
 import { IconBraces, IconChat, IconCurve, IconGear, IconLayers, IconPlus, IconSearch, IconSparkles, IconText, IconWave, IconWrench } from "./ui/icons";
 
 const TABS = [
@@ -81,7 +80,6 @@ export function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <button className="brand-btn" title="bone.aep — оформление и настройки" onClick={() => goTo("settings")}><BrandMark /></button>
         <nav className="tabs" role="tablist">
           {TABS.map((t) => (
             <button key={t.id} role="tab" aria-selected={t.id === current?.id} className={`tab${t.id === current?.id ? " active" : ""}`} title={t.title} onClick={() => goTo(t.id)}>
@@ -106,7 +104,7 @@ export function App() {
       <footer className={`statusbar status-${recent ? status.kind : sel.connected || !inAE() ? "ok" : "error"}`} title={recent ? status.text : info}>
         <span className="status-dot" />
         <span className="status-text">{recent ? status.text : `${sel.connected ? "Подключено" : inAE() ? "Нет связи с AE" : "Демо"} · ${info}`}</span>
-        <span className="status-ver">bone.aep · AE Assistant {VERSION}{BUILD ? ` · ${BUILD}` : ""}</span>
+        <span className="status-ver">AE Assistant {VERSION}{BUILD ? ` · ${BUILD}` : ""}</span>
       </footer>
 
       {palette && <Palette commands={commands} onClose={() => setPalette(false)} />}

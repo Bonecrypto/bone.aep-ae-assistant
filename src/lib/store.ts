@@ -31,7 +31,7 @@ const defaults: Prefs = {
   animMode: "in",
   duration: 0.6,
   spring: false,
-  solidColor: "#7f00ff",
+  solidColor: "#9f18ec",
   elementColor: "#ffffff",
   elementWidth: 8,
   stepFrames: 5,
@@ -44,7 +44,7 @@ const defaults: Prefs = {
   chatConfirm: true,
   favorites: [],
   lastPreset: {},
-  accent: "#7f00ff",
+  accent: "#9f18ec",
   theme: "dark",
   customCurves: [],
 };
@@ -57,7 +57,7 @@ function load(): Prefs {
   try {
     const raw = localStorage.getItem(KEY);
     const saved = raw ? (JSON.parse(raw) as Partial<Prefs>) : {};
-    if (saved.accent === "#9f18ec") saved.accent = defaults.accent; // старый акцент по умолчанию -> фирменный Violet
+    if (saved.accent === "#7f00ff") saved.accent = defaults.accent; // акцент из 0.5.1 по умолчанию -> обратно фиолетовый из ТЗ
     return { ...defaults, ...saved };
   } catch {
     return { ...defaults };

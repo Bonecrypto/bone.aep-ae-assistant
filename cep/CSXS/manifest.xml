@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<ExtensionManifest Version="7.0" ExtensionBundleId="com.aeassistant.panel" ExtensionBundleVersion="0.5.1"
+<ExtensionManifest Version="7.0" ExtensionBundleId="com.aeassistant.panel" ExtensionBundleVersion="0.5.2"
   ExtensionBundleName="AE Assistant" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <ExtensionList>
-    <Extension Id="com.aeassistant.panel.main" Version="0.5.1" />
+    <Extension Id="com.aeassistant.panel.main" Version="0.5.2" />
   </ExtensionList>
   <ExecutionEnvironment>
     <HostList>

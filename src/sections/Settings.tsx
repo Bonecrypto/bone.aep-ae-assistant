@@ -6,7 +6,8 @@ import { openUrl } from "../lib/cep";
 import { setPrefs, setStatus, usePrefs } from "../lib/store";
 import { canSelfUpdate, fetchReleases, installRelease, isCurrent, isNewer, type Release } from "../lib/update";
 import { Btn, Row, Seg } from "../ui/ui";
-import { BRAND_ACCENTS, BrandLogo } from "../ui/Brand";
+
+const ACCENTS = ["#9f18ec", "#0a84ff", "#ff6b2c", "#e0245e", "#30b06f", "#6e5cff", "#c8a24a"];
 
 export function SettingsSection() {
   const p = usePrefs();
@@ -47,17 +48,12 @@ export function SettingsSection() {
     }
   };
 
-  const accentName = BRAND_ACCENTS.find((a) => a.hex === p.accent)?.name ?? p.accent;
   return (
     <section className="section settings">
-      <div className="panel brand-panel">
-        <BrandLogo />
-        <button className="link" onClick={() => openUrl("https://boneaep.com")}>boneaep.com</button>
-      </div>
       <div className="panel">
-        <div className="panel-title">Оформление <span className="hint">· {accentName}</span></div>
+        <div className="panel-title">Оформление</div>
         <div className="swatches">
-          {BRAND_ACCENTS.map((c) => <button key={c.hex} className={`swatch${p.accent === c.hex ? " on" : ""}`} style={{ background: c.hex }} title={c.name} onClick={() => setPrefs({ accent: c.hex })} />)}
+          {ACCENTS.map((c) => <button key={c} className={`swatch${p.accent === c ? " on" : ""}`} style={{ background: c }} title={c} onClick={() => setPrefs({ accent: c })} />)}
         </div>
         <Seg value={p.theme} onChange={(v) => setPrefs({ theme: v })} options={[{ value: "dark", label: "Тёмная" }, { value: "light", label: "Светлая" }]} />
       </div>
