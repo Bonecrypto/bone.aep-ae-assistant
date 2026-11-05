@@ -1,12 +1,12 @@
-// Собирает папку расширения: client/ (Vite) + CSXS/manifest.xml + host/ + .debug
+// Собирает папку расширения: client/ (Vite) + CSXS/manifest.xml + host/index.jsx + .debug
 import fs from "node:fs";
 import path from "node:path";
+import { bundleHost } from "./host-bundle.mjs";
 
 const root = path.resolve(".");
 const out = path.join(root, "dist", "com.aeassistant.panel");
-const copy = (from, to) => fs.cpSync(path.join(root, from), path.join(out, to), { recursive: true });
-
-copy("cep/CSXS", "CSXS");
-copy("cep/.debug", ".debug");
-copy("host", "host");
+fs.cpSync(path.join(root, "cep/CSXS"), path.join(out, "CSXS"), { recursive: true });
+fs.cpSync(path.join(root, "cep/.debug"), path.join(out, ".debug"));
+fs.mkdirSync(path.join(out, "host"), { recursive: true });
+fs.writeFileSync(path.join(out, "host", "index.jsx"), bundleHost(root));
 console.log(`Расширение собрано: ${out}`);

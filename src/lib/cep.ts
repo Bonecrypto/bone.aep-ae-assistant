@@ -1,10 +1,16 @@
 // Мост панель → After Effects. В CEP это window.__adobe_cep__.evalScript.
 // В обычном браузере (npm run dev) — заглушка, чтобы можно было верстать без AE.
 
-type CepBridge = { evalScript: (script: string, cb?: (result: string) => void) => void };
+type CepBridge = {
+  evalScript: (script: string, cb?: (result: string) => void) => void;
+  registerKeyEventsInterest?: (json: string) => void;
+};
 
 declare global {
-  interface Window { __adobe_cep__?: CepBridge }
+  interface Window {
+    __adobe_cep__?: CepBridge;
+    cep?: { util?: { openURLInDefaultBrowser?: (url: string) => void } };
+  }
 }
 
 export const inAE = (): boolean => typeof window !== "undefined" && !!window.__adobe_cep__;
@@ -20,23 +26,41 @@ export function callHost(name: string, args: Record<string, unknown> = {}): Prom
 
   return new Promise((resolve) => {
     bridge.evalScript(script, (raw) => {
-      if (raw === "EvalScript error.") {
-        resolve({ ok: false, code: "HOST_NOT_LOADED" });
-        return;
-      }
-      try {
-        resolve(JSON.parse(raw) as HostResult);
-      } catch {
-        resolve({ ok: false, code: "BAD_RESPONSE", raw });
-      }
+      if (raw === "EvalScript error.") { resolve({ ok: false, code: "HOST_NOT_LOADED" }); return; }
+      try { resolve(JSON.parse(raw) as HostResult); } catch { resolve({ ok: false, code: "BAD_RESPONSE", raw }); }
     });
   });
 }
 
+/** Открыть ссылку в браузере по умолчанию (в AE) или в новой вкладке (в браузере). */
+export function openUrl(url: string) {
+  const open = window.cep?.util?.openURLInDefaultBrowser;
+  if (open) open(url); else window.open(url, "_blank", "noopener");
+}
+
+/**
+ * Просим AE отдавать панели сочетания клавиш, иначе Ctrl+K откроет настройки композиции.
+ * Коды клавиш Windows: K = 75. На macOS — 40.
+ */
+export function registerShortcuts() {
+  const reg = window.__adobe_cep__?.registerKeyEventsInterest;
+  if (!reg) return;
+  reg(JSON.stringify([
+    { keyCode: 75, ctrlKey: true },
+    { keyCode: 40, metaKey: true },
+  ]));
+}
+
 function mockHost(name: string): Promise<HostResult> {
-  return new Promise((r) =>
-    setTimeout(() => r(name === "system.ping"
-      ? { ok: true, appVersion: "браузер", hasComp: false }
-      : { ok: true, changed: 2, skipped: { locked: 0, noPosition: 0, expression: 0 }, mock: true }), 250),
-  );
+  const fake: Record<string, HostResult> = {
+    "system.ping": { ok: true, appVersion: "браузер", hasComp: false },
+    "ae.readEase": { ok: true, curve: [0.33, 0, 0.67, 1], property: "Position", manual: { outSpeed: 0, outInfluence: 33, inSpeed: 0, inInfluence: 33 } },
+    "ae.textCopyStyle": { ok: true, style: { font: "Inter-Bold", fontSize: 96 }, from: "Заголовок" },
+    "ae.compInfo": { ok: true, comp: { name: "Демо", width: 1920, height: 1080, fps: 25, duration: 10, time: 1, numLayers: 2, selectedCount: 1, markers: [], layers: [{ index: 1, name: "Логотип", kind: "image", selected: true }, { index: 2, name: "Фон", kind: "solid", selected: false }] } },
+    "ae.create": { ok: true, layer: "Слой", parented: 0 },
+    "ae.element": { ok: true, layer: "Элемент" },
+    "ae.precompose": { ok: true, comp: "Прекомпоз", changed: 2 },
+  };
+  const r = fake[name] ?? { ok: true, changed: 2, skipped: { locked: 0, noPosition: 0, expression: 0 }, mock: true };
+  return new Promise((res) => setTimeout(() => res(r), 200));
 }

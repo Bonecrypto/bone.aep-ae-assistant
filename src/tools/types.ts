@@ -3,7 +3,7 @@ import type { HostResult } from "../lib/cep";
 /** JSON Schema входа инструмента (то же, что получит ИИ-модель). */
 export type InputSchema = {
   type: "object";
-  properties: Record<string, { type: string; description: string; enum?: string[]; minimum?: number; maximum?: number; default?: unknown }>;
+  properties: Record<string, Record<string, unknown> & { description: string }>;
   required?: string[];
 };
 
@@ -20,5 +20,7 @@ export interface Tool<I = Record<string, unknown>> {
   description: string;
   inputSchema: InputSchema;
   mutates: boolean;
+  /** Человеческое описание конкретного вызова — для подтверждения в чате. */
+  describe?: (input: I) => string;
   run: (input: I) => Promise<ToolResult>;
 }

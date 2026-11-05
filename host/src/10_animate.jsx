@@ -1,62 +1,8 @@
-/*
- * AE Assistant — ExtendScript-часть (выполняется внутри After Effects).
- * Синтаксис ES3: только var, без стрелочных функций, без JSON.
- * В этом файле — только ASCII. Русские тексты приходят из панели,
- * чтобы не зависеть от кодировки, в которой AE прочитает .jsx.
- *
- * Каждое действие: AEA.run("<tool>", {...}) -> JSON-строка
- *   { ok: true, ... } или { ok: false, code: "NO_COMP", ... }
- */
-(function (global) {
-  if (global.AEA && global.AEA.__version === "0.2.0") return;
-
-  // ---------- JSON.stringify для ES3 ----------
-  function quote(s) {
-    return '"' + String(s).replace(/[\\"\u0000-\u001f\u007f-\uffff]/g, function (c) {
-      if (c === '"') return '\\"';
-      if (c === "\\") return "\\\\";
-      var h = c.charCodeAt(0).toString(16);
-      return "\\u" + "0000".substring(h.length) + h;
-    }) + '"';
-  }
-  function stringify(v) {
-    var i, out, k;
-    if (v === null || v === undefined) return "null";
-    if (typeof v === "number") return isFinite(v) ? String(v) : "null";
-    if (typeof v === "boolean") return v ? "true" : "false";
-    if (typeof v === "string") return quote(v);
-    if (v instanceof Array) {
-      out = [];
-      for (i = 0; i < v.length; i++) out.push(stringify(v[i]));
-      return "[" + out.join(",") + "]";
-    }
-    out = [];
-    for (k in v) if (v.hasOwnProperty(k)) out.push(quote(k) + ":" + stringify(v[k]));
-    return "{" + out.join(",") + "}";
-  }
-
-  function fail(code, extra) {
-    var r = { ok: false, code: code };
-    if (extra) for (var k in extra) if (extra.hasOwnProperty(k)) r[k] = extra[k];
-    return r;
-  }
-
-  function activeComp() {
-    var item = app.project ? app.project.activeItem : null;
-    return item && item instanceof CompItem ? item : null;
-  }
-
-  // ---------- Инструменты ----------
-  var tools = {};
-
-  tools["system.ping"] = function () {
-    return { ok: true, appVersion: app.version, hasComp: activeComp() !== null };
-  };
-
   /*
    * ae.animate — влёт/улёт выделенных слоёв.
    * args: {
-   *   kind: "slide" | "fade" | "scale",
+   *   kind: "slide" | "fade" | "scale" | "rotate",
+   *   spring: false,  — пружина: перелёт за конечное значение и возврат (только для влёта, кроме fade)
    *   mode: "in" | "out",
    *   direction: "left" | "right" | "up" | "down"   (только для slide),
    *   duration: 0.6, undoName: "..."
@@ -65,7 +11,7 @@
    * out: t0 = CTI (текущее значение) -> t1 = CTI + duration (за кадром / 0%)
    * Ease — настоящий KeyframeEase: влёт тормозит в конце, улёт разгоняется в начале.
    */
-  var KINDS = { slide: 1, fade: 1, scale: 1 };
+  var KINDS = { slide: 1, fade: 1, scale: 1, rotate: 1 };
   var DIRS = { left: 1, right: 1, up: 1, down: 1 };
 
   tools["ae.animate"] = function (args) {
@@ -84,8 +30,7 @@
     var changed = 0;
     var skipped = { locked: 0, noPosition: 0, expression: 0 };
 
-    app.beginUndoGroup(args.undoName || "AE Assistant");
-    try {
+    undoable(args.undoName, function () {
       for (var i = 0; i < layers.length; i++) {
         var layer = layers[i];
         if (layer.locked) { skipped.locked++; continue; }
@@ -95,18 +40,18 @@
 
         var target = targetFor(args, layer, tr, comp, t0);
         if (!target) { skipped.noPosition++; continue; }
-        if (target.prop.expressionEnabled && target.prop.expression !== "") { skipped.expression++; continue; }
+        if (hasExpression(target.prop)) { skipped.expression++; continue; }
 
         var restVal = target.prop.valueAtTime(t0, true);
         var offVal = target.off(restVal);
-        target.prop.setValueAtTime(t0, isIn ? offVal : restVal);
-        target.prop.setValueAtTime(t1, isIn ? restVal : offVal);
-        applyEase(target.prop, t0, t1, isIn);
+        if (args.spring && isIn && args.kind !== "fade") {
+          springKeys(target.prop, t0, t1, offVal, restVal, args.kind === "scale" ? 0.12 : 0.07);
+        } else {
+          keyPair(target.prop, t0, t1, isIn ? offVal : restVal, isIn ? restVal : offVal, isIn ? 15 : 85, isIn ? 85 : 15);
+        }
         changed++;
       }
-    } finally {
-      app.endUndoGroup();
-    }
+    });
 
     if (changed === 0) return fail("NOTHING_CHANGED", { skipped: skipped });
     return { ok: true, changed: changed, skipped: skipped, start: t0, end: t1 };
@@ -117,10 +62,53 @@
     return tools["ae.animate"]({ kind: "slide", mode: "in", direction: args.direction, duration: args.duration, undoName: args.undoName });
   };
 
+  // Пружина: off -> перелёт на amount за rest -> rest. Ease на каждом ключе.
+  function lerp(a, b, k) {
+    if (!(a instanceof Array)) return a + (b - a) * k;
+    var r = [];
+    for (var i = 0; i < a.length; i++) r.push(a[i] + (b[i] - a[i]) * k);
+    return r;
+  }
+  function springKeys(prop, t0, t1, off, rest, amount) {
+    var tm = t0 + (t1 - t0) * 0.6;
+    prop.setValueAtTime(t0, off);
+    prop.setValueAtTime(tm, lerp(off, rest, 1 + amount));
+    prop.setValueAtTime(t1, rest);
+    var n = easeDims(prop), B = KeyframeInterpolationType.BEZIER;
+    var k0 = prop.nearestKeyIndex(t0), km = prop.nearestKeyIndex(tm), k1 = prop.nearestKeyIndex(t1);
+    prop.setInterpolationTypeAtKey(k0, prop.keyInInterpolationType(k0), B);
+    prop.setInterpolationTypeAtKey(km, B, B);
+    prop.setInterpolationTypeAtKey(k1, B, prop.keyOutInterpolationType(k1));
+    prop.setTemporalEaseAtKey(k0, prop.keyInTemporalEase(k0), easeList(n, 0, 20));
+    prop.setTemporalEaseAtKey(km, easeList(n, 0, 75), easeList(n, 0, 50));
+    prop.setTemporalEaseAtKey(k1, easeList(n, 0, 70), prop.keyOutTemporalEase(k1));
+  }
+
+  // Моушн-блюр: включить/выключить у выделенных слоёв и в композиции.
+  tools["ae.motionBlur"] = function (args) {
+    var comp = activeComp();
+    if (!comp) return fail("NO_COMP");
+    var layers = selectedLayers(comp);
+    if (!layers.length) return fail("NO_SELECTION");
+    var on = args.on !== false, changed = 0;
+    undoable(args.undoName, function () {
+      if (on) comp.motionBlur = true;
+      for (var i = 0; i < layers.length; i++) {
+        if (layers[i].locked || layers[i] instanceof CameraLayer || layers[i] instanceof LightLayer) continue;
+        layers[i].motionBlur = on;
+        changed++;
+      }
+    });
+    return { ok: true, changed: changed, on: on };
+  };
+
   // Какое свойство анимировать и как получить «спрятанное» значение из текущего.
   function targetFor(args, layer, tr, comp, t) {
     if (args.kind === "fade") {
       return { prop: tr.property("ADBE Opacity"), off: function () { return 0; } };
+    }
+    if (args.kind === "rotate") {
+      return { prop: tr.property("ADBE Rotate Z"), off: function (v) { return v + (args.mode === "in" ? -90 : 90); } };
     }
     if (args.kind === "scale") {
       return { prop: tr.property("ADBE Scale"), off: function (v) {
@@ -171,37 +159,3 @@
     }
   }
 
-  // Bezier + KeyframeEase. Количество объектов ease берём из самого ключа
-  // (1 для пространственных и 1D, 2/3 для TwoD/ThreeD — см. setTemporalEaseAtKey).
-  function easeList(prop, k, influence) {
-    var n = prop.keyInTemporalEase(k).length;
-    var r = [];
-    for (var d = 0; d < n; d++) r.push(new KeyframeEase(0, influence));
-    return r;
-  }
-  function applyEase(prop, t0, t1, isIn) {
-    var k0 = prop.nearestKeyIndex(t0);
-    var k1 = prop.nearestKeyIndex(t1);
-    var B = KeyframeInterpolationType.BEZIER;
-    var startInf = isIn ? 15 : 85;
-    var endInf = isIn ? 85 : 15;
-    prop.setInterpolationTypeAtKey(k0, prop.keyInInterpolationType(k0), B);
-    prop.setInterpolationTypeAtKey(k1, B, prop.keyOutInterpolationType(k1));
-    prop.setTemporalEaseAtKey(k0, prop.keyInTemporalEase(k0), easeList(prop, k0, startInf));
-    prop.setTemporalEaseAtKey(k1, easeList(prop, k1, endInf), prop.keyOutTemporalEase(k1));
-  }
-
-  // ---------- Точка входа ----------
-  global.AEA = {
-    __version: "0.2.0",
-    run: function (name, args) {
-      try {
-        var fn = tools[name];
-        if (!fn) return stringify(fail("UNKNOWN_TOOL", { tool: name }));
-        return stringify(fn(args || {}));
-      } catch (e) {
-        return stringify(fail("EXCEPTION", { message: String(e), line: e.line }));
-      }
-    }
-  };
-})($.global);

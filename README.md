@@ -1,64 +1,62 @@
 # AE Assistant
 
-Панель для Adobe After Effects: ИИ-чат и быстрые действия над композицией.
-Сейчас: каркас CEP-панели, кнопка «Влёт слева» и чат-заглушка, которая отвечает «привет».
+Одна панель для Adobe After Effects вместо пачки плагинов: анимации, графики скорости, выражения,
+элементы, текст, сервис, палитра команд (Ctrl+K) и ИИ-чат, который сам выполняет действия в проекте.
+
+Установка для пользователей — [INSTALL.md](INSTALL.md): скачать архив из релиза, запустить `install.cmd`.
 
 ## Почему CEP, а не UXP
-В After Effects (26.x, осень 2026) UXP даёт только скриптовые API в превью, готовой системы панелей нет.
-Поэтому панель — CEP (React + TypeScript + Vite), действия — ExtendScript (`host/*.jsx`).
-Переход на UXP — когда Adobe выпустит панели для AE в стабильной версии.
+В After Effects (26.x, осень 2026) UXP даёт только скриптовые API в превью, системы панелей нет.
+Поэтому панель — CEP (React + TypeScript + Vite), действия — ExtendScript (`host/src/*.jsx`).
 
-## Установка
-Для пользователей — [INSTALL.md](INSTALL.md): скачать архив, запустить `install.cmd`.
-
-## Установка для разработки (Windows)
+## Разработка (Windows)
 Нужны Node.js 20+ и After Effects 2022 (22.0) или новее.
 
 ```bash
 npm install
+```
+```bash
 npm run build
+```
+```bash
 npm run install:dev
 ```
 
-`install:dev` включает `PlayerDebugMode` для CEP 11–13 (разрешает неподписанные панели)
-и копирует сборку в `%APPDATA%\Adobe\CEP\extensions\com.aeassistant.panel`.
-Затем перезапустите AE → **Окно → Расширения → AE Assistant**.
+Перезапустите AE → **Window → Extensions → AE Assistant**. DevTools панели: `http://localhost:8860`.
 
-Отладка панели (DevTools): откройте в Chrome `http://localhost:8860`.
-
-## Проверка в AE
-1. Создайте композицию, добавьте пару слоёв, выделите их.
-2. Поставьте указатель времени туда, где слой должен оказаться на месте.
-3. Нажмите «Влёт слева» → на позиции появятся 2 ключа (0,6 с) с ease.
-4. Один **Ctrl+Z** отменяет всё действие.
-
-## Команды
 | Команда | Что делает |
 |---|---|
 | `npm run dev` | панель в браузере (без AE, ответы AE имитируются) |
-| `npm run build` | проверка типов + проверка host-скриптов + сборка в `dist/com.aeassistant.panel` |
-| `npm test` | прогон `host/*.jsx` на имитации объектов AE |
-| `npm run install:dev` | установка сборки в папку расширений CEP |
+| `npm test` | host-скрипт на имитации объектов AE |
+| `npm run build` | типы + проверка host (ES3, ASCII) + сборка в `dist/com.aeassistant.panel` |
 | `npm run package` | архив для релиза `dist/release/AE-Assistant-<версия>-win.zip` |
+| `npm run install:dev` | установка сборки в папку расширений CEP |
+
+## Релизы и обновления
+GitHub Actions (`.github/workflows/release.yml`) на каждый push в `main` прогоняет тесты, собирает архив
+и публикует релиз `v<версия>-b<номер сборки>`. Панель проверяет релизы при запуске, ставит обновление сама
+(через Node.js в CEP) и даёт откатиться на прошлую сборку в настройках.
 
 ## Структура
 ```
-cep/CSXS/manifest.xml   манифест CEP-расширения
-host/index.jsx          ExtendScript: AEA.run("<tool>", {...}) → JSON
-src/lib/cep.ts          мост панель → AE (evalScript)
-src/tools/              инструменты: { name, description, inputSchema, mutates, run }
-src/tools/ae/flyIn.ts   «Влёт слева»
-src/chat/provider.ts    провайдер чата (пока заглушка)
-src/App.tsx             интерфейс
+cep/CSXS/manifest.xml     манифест CEP-расширения
+host/src/*.jsx            ExtendScript, склеивается в host/index.jsx: AEA.run("<tool>", {...}) → JSON
+  00_core                 JSON, undo-группы, ease-помощники
+  10_animate 20_ease 30_expressions 40_create 50_text 60_elements 70_service 80_info
+src/tools/                инструменты { name, description, inputSchema, mutates, run } — их видят кнопки и ИИ
+src/presets/              кривые, выражения, эффекты, элементы
+src/sections/             вкладки панели
+src/chat/                 OpenAI-совместимый клиент (OpenRouter / Gemini / Ollama) с вызовом инструментов
+src/commands.ts           все действия для палитры Ctrl+K
+test/                     имитация объектной модели AE и тесты host
 ```
 
 ### Как добавить возможность
-1. Функция в `host/index.jsx`: `tools["ae.xxx"] = function (args) {...}` внутри
-   `app.beginUndoGroup(args.undoName)` / `finally { app.endUndoGroup() }`.
-2. Модуль `src/tools/ae/xxx.ts` с `description` для модели и понятными ошибками.
-3. Строка в `src/tools/registry.ts`.
+1. Функция в `host/src/NN_*.jsx`: `tools["ae.xxx"] = function (args) { … undoable(args.undoName, function () { … }) … }`.
+2. Инструмент в `src/tools/ae/*.ts` через `hostTool({...})` — с понятным `description` для модели.
+3. Строка в `src/tools/registry.ts`, плитка в нужной вкладке, команда в `src/commands.ts`, тест в `test/host.test.mjs`.
 
 ### Правила для host-скриптов
-- Только ES3 (`var`, без `=>`, `let`, шаблонных строк) и только ASCII в коде:
-  русские тексты (имена undo, сообщения) приходят из панели. `npm run build` это проверяет.
-- Методы сверяются с [AE Scripting Guide](https://ae-scripting.docsforadobe.dev/).
+- Только ES3 (`var`, без `=>`, `let`, шаблонных строк, `forEach`/`map`) и только ASCII в коде:
+  русские тексты (имена undo, слоёв, эффектов) приходят из панели. `npm run build` это проверяет.
+- Методы и matchName сверяются с [AE Scripting Guide](https://ae-scripting.docsforadobe.dev/).

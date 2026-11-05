@@ -1,167 +1,89 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import { callHost, inAE } from "./lib/cep";
-import { animate, animTitle, type AnimateInput, type AnimMode } from "./tools/ae/animate";
-import { stubProvider, type ChatMessage } from "./chat/provider";
-import { AnimPreview } from "./ui/AnimPreview";
-import { IconChat, IconSend, IconSparkles } from "./ui/icons";
+import { useEffect, useMemo, useState } from "react";
+import { buildCommands } from "./commands";
+import { callHost, inAE, registerShortcuts } from "./lib/cep";
+import { setPrefs, setStatus, usePrefs, useStatus } from "./lib/store";
+import { fetchReleases, isNewer, type Release } from "./lib/update";
+import { AnimateSection } from "./sections/Animate";
+import { ChatSection } from "./sections/Chat";
+import { CreateSection } from "./sections/Create";
+import { EaseSection } from "./sections/Ease";
+import { ExpressionsSection } from "./sections/Expressions";
+import { ServiceSection } from "./sections/Service";
+import { SettingsSection } from "./sections/Settings";
+import { TextSection } from "./sections/Text";
+import { Palette } from "./ui/Palette";
+import { IconBraces, IconChat, IconCurve, IconGear, IconPlus, IconSearch, IconSparkles, IconText, IconWrench } from "./ui/icons";
 
-type Tab = "actions" | "chat";
-type Status = { kind: "idle" | "busy" | "ok" | "error"; text: string };
-
-// Удобства для одного пользователя: помним вкладку, режим и длительность.
-const load = <T,>(key: string, fallback: T): T => {
-  try { const v = localStorage.getItem(`aea.${key}`); return v === null ? fallback : (JSON.parse(v) as T); } catch { return fallback; }
-};
-const save = (key: string, v: unknown) => { try { localStorage.setItem(`aea.${key}`, JSON.stringify(v)); } catch { /* нет хранилища */ } };
+const TABS = [
+  { id: "animate", title: "Анимация", icon: IconSparkles },
+  { id: "ease", title: "Скорость (графики)", icon: IconCurve },
+  { id: "expr", title: "Выражения", icon: IconBraces },
+  { id: "create", title: "Создать: слои, эффекты, элементы", icon: IconPlus },
+  { id: "text", title: "Текст", icon: IconText },
+  { id: "service", title: "Сервис", icon: IconWrench },
+  { id: "chat", title: "Чат с ассистентом", icon: IconChat },
+  { id: "settings", title: "Настройки и обновления", icon: IconGear },
+] as const;
 
 export function App() {
-  const [tab, setTab] = useState<Tab>(() => load<Tab>("tab", "actions"));
-  const [status, setStatus] = useState<Status>({ kind: "idle", text: "Подключение к After Effects…" });
+  const { tab } = usePrefs();
+  const status = useStatus();
+  const [palette, setPalette] = useState(false);
+  const [update, setUpdate] = useState<Release | null>(null);
+  const goTo = (id: string) => setPrefs({ tab: id });
+  const commands = useMemo(() => buildCommands(goTo), []);
 
-  useEffect(() => save("tab", tab), [tab]);
   useEffect(() => {
+    registerShortcuts();
     callHost("system.ping").then((r) => {
       if (!r.ok) { setStatus({ kind: "error", text: "Скрипт панели не загрузился в AE. Переоткройте панель." }); return; }
       const ver = String(r.appVersion).split("x")[0];
-      setStatus({ kind: "idle", text: inAE() ? `After Effects ${ver} · готов` : "Режим браузера: AE не подключён" });
+      setStatus({ kind: "idle", text: inAE() ? `After Effects ${ver} · готов · Ctrl+K — поиск действий` : "Режим браузера: AE не подключён" });
     });
+    // тихая проверка обновлений при запуске
+    if (inAE()) fetchReleases().then((l) => setUpdate(l.find(isNewer) ?? null)).catch(() => {});
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.code === "KeyK") { e.preventDefault(); setPalette((v) => !v); }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
   }, []);
+
+  const current = TABS.find((t) => t.id === tab) ?? TABS[0];
 
   return (
     <div className="app">
       <header className="header">
-        <div className="brand"><span className="dot" />Ассистент</div>
         <nav className="tabs" role="tablist">
-          <TabButton active={tab === "actions"} onClick={() => setTab("actions")} title="Действия"><IconSparkles /></TabButton>
-          <TabButton active={tab === "chat"} onClick={() => setTab("chat")} title="Чат с ассистентом"><IconChat /></TabButton>
+          {TABS.map((t) => (
+            <button key={t.id} role="tab" aria-selected={t.id === current.id} className={`tab${t.id === current.id ? " active" : ""}`} title={t.title} onClick={() => goTo(t.id)}>
+              <t.icon />
+            </button>
+          ))}
         </nav>
+        <button className="tab search" title="Поиск действий (Ctrl+K)" onClick={() => setPalette(true)}><IconSearch /></button>
       </header>
+      <div className="title-row"><h1>{current.title.split(" (")[0].split(":")[0]}</h1>
+        {update && <button className="update-pill" onClick={() => goTo("settings")} title="Открыть настройки обновлений">Обновление {update.version}</button>}
+      </div>
 
       <main className="main">
-        {tab === "actions" ? <Actions setStatus={setStatus} /> : <Chat />}
+        {current.id === "animate" && <AnimateSection />}
+        {current.id === "ease" && <EaseSection />}
+        {current.id === "expr" && <ExpressionsSection />}
+        {current.id === "create" && <CreateSection />}
+        {current.id === "text" && <TextSection />}
+        {current.id === "service" && <ServiceSection />}
+        {current.id === "chat" && <ChatSection onOpenSettings={() => goTo("settings")} />}
+        {current.id === "settings" && <SettingsSection />}
       </main>
 
       <footer className={`status status-${status.kind}`} role="status" title={status.text}>
         <span className="status-dot" />
         <span className="status-text">{status.text}</span>
       </footer>
+
+      {palette && <Palette commands={commands} onClose={() => setPalette(false)} />}
     </div>
-  );
-}
-
-function TabButton(props: { active: boolean; onClick: () => void; title: string; children: React.ReactNode }) {
-  return (
-    <button role="tab" aria-selected={props.active} className={`tab ${props.active ? "active" : ""}`} onClick={props.onClick} title={props.title}>
-      {props.children}
-    </button>
-  );
-}
-
-const PRESETS: Omit<AnimateInput, "mode" | "duration">[] = [
-  { kind: "slide", direction: "left" },
-  { kind: "slide", direction: "right" },
-  { kind: "slide", direction: "up" },
-  { kind: "slide", direction: "down" },
-  { kind: "fade" },
-  { kind: "scale" },
-];
-const DURATIONS = [0.3, 0.6, 1];
-
-function Actions({ setStatus }: { setStatus: (s: Status) => void }) {
-  const [busy, setBusy] = useState(false);
-  const [mode, setMode] = useState<AnimMode>(() => load<AnimMode>("mode", "in"));
-  const [duration, setDuration] = useState<number>(() => load("duration", 0.6));
-  useEffect(() => save("mode", mode), [mode]);
-  useEffect(() => save("duration", duration), [duration]);
-
-  const run = async (input: AnimateInput) => {
-    if (busy) return;
-    setBusy(true);
-    setStatus({ kind: "busy", text: `${animTitle(input)}…` });
-    try {
-      const r = await animate.run(input);
-      setStatus({ kind: r.ok ? "ok" : "error", text: r.message });
-    } catch (e) {
-      setStatus({ kind: "error", text: `Не удалось выполнить: ${String(e)}` });
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <section className="actions">
-      <div className="toolbar">
-        <div className="segmented" role="radiogroup" aria-label="Режим">
-          {(["in", "out"] as const).map((m) => (
-            <button key={m} role="radio" aria-checked={mode === m} className={mode === m ? "on" : ""} onClick={() => setMode(m)}
-              title={m === "in" ? "Слой появляется: ключи от текущего времени к его текущему положению" : "Слой исчезает: от текущего положения за кадр"}>
-              {m === "in" ? "Влёт" : "Улёт"}
-            </button>
-          ))}
-        </div>
-        <div className="segmented" role="radiogroup" aria-label="Длительность">
-          {DURATIONS.map((d) => (
-            <button key={d} role="radio" aria-checked={duration === d} className={duration === d ? "on" : ""} onClick={() => setDuration(d)}
-              title={`Длительность ${String(d).replace(".", ",")} с`}>
-              {String(d).replace(".", ",")} с
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="grid">
-        {PRESETS.map((p) => {
-          const input: AnimateInput = { ...p, mode, duration };
-          const title = animTitle(input);
-          const onKey = (e: KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); run(input); } };
-          return (
-            <div key={title} role="button" tabIndex={0} aria-disabled={busy} className={`tile ${busy ? "disabled" : ""}`}
-              onClick={() => run(input)} onKeyDown={onKey}
-              title={`${title}: выделенные слои, от текущего времени, ${String(duration).replace(".", ",")} с. Один Ctrl+Z отменит.`}>
-              <AnimPreview input={input} />
-              <div className="tile-label">{title}</div>
-            </div>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
-
-function Chat() {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [text, setText] = useState("");
-  const [thinking, setThinking] = useState(false);
-  const listRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => { listRef.current?.scrollTo({ top: listRef.current.scrollHeight }); }, [messages, thinking]);
-
-  const send = async () => {
-    const t = text.trim();
-    if (!t || thinking) return;
-    const history: ChatMessage[] = [...messages, { role: "user", text: t }];
-    setMessages(history);
-    setText("");
-    setThinking(true);
-    try {
-      const reply = await stubProvider.reply(history);
-      setMessages((m) => [...m, { role: "assistant", text: reply }]);
-    } finally {
-      setThinking(false);
-    }
-  };
-
-  return (
-    <section className="chat">
-      <div className="messages" ref={listRef}>
-        {messages.length === 0 && <div className="empty">Спросите что-нибудь об анимации или вашей композиции.</div>}
-        {messages.map((m, i) => <div key={i} className={`msg ${m.role}`}>{m.text}</div>)}
-        {thinking && <div className="msg assistant typing">…</div>}
-      </div>
-      <form className="composer" onSubmit={(e) => { e.preventDefault(); send(); }}>
-        <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Напишите сообщение…" />
-        <button type="submit" disabled={!text.trim() || thinking} title="Отправить (Enter)"><IconSend /></button>
-      </form>
-    </section>
   );
 }

@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<ExtensionManifest Version="7.0" ExtensionBundleId="com.aeassistant.panel" ExtensionBundleVersion="0.2.0"
+<ExtensionManifest Version="7.0" ExtensionBundleId="com.aeassistant.panel" ExtensionBundleVersion="0.3.0"
   ExtensionBundleName="AE Assistant" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <ExtensionList>
-    <Extension Id="com.aeassistant.panel.main" Version="0.2.0" />
+    <Extension Id="com.aeassistant.panel.main" Version="0.3.0" />
   </ExtensionList>
   <ExecutionEnvironment>
     <HostList>
@@ -24,6 +24,9 @@
           <ScriptPath>./host/index.jsx</ScriptPath>
           <CEFCommandLine>
             <Parameter>--allow-file-access-from-files</Parameter>
+            <!-- Node.js нужен только для автообновления (скачать архив и распаковать поверх) -->
+            <Parameter>--enable-nodejs</Parameter>
+            <Parameter>--mixed-context</Parameter>
           </CEFCommandLine>
         </Resources>
         <Lifecycle>
@@ -33,7 +36,7 @@
           <Type>Panel</Type>
           <Menu>AE Assistant</Menu>
           <Geometry>
-            <Size><Height>560</Height><Width>380</Width></Size>
+            <Size><Height>620</Height><Width>360</Width></Size>
             <MinSize><Height>360</Height><Width>280</Width></MinSize>
           </Geometry>
         </UI>

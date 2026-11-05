@@ -1,0 +1,47 @@
+# На каждый push в main: проверки, сборка панели и релиз с архивом для Windows.
+# Панель сама смотрит releases/latest и предлагает обновиться (откат — в настройках).
+name: Сборка и релиз
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm test
+      - run: npm run package   # номер сборки берётся из GITHUB_RUN_NUMBER
+
+      - name: Опубликовать релиз
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="v${VERSION}-b${GITHUB_RUN_NUMBER}"
+          ZIP="dist/release/AE-Assistant-${VERSION}-win.zip"
+          {
+            echo "## AE Assistant ${VERSION} · сборка ${GITHUB_RUN_NUMBER}"
+            echo
+            git log -1 --pretty=%B
+            echo
+            echo "**Установка:** скачай \`AE-Assistant-${VERSION}-win.zip\`, распакуй, закрой After Effects и запусти \`install.cmd\`."
+            echo "Уже установлена панель — обнови её в настройках (шестерёнка → Обновления)."
+          } > notes.md
+          gh release create "$TAG" "$ZIP" --title "AE Assistant ${VERSION} (сборка ${GITHUB_RUN_NUMBER})" --notes-file notes.md --latest
