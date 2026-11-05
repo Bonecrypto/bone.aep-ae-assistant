@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<ExtensionManifest Version="7.0" ExtensionBundleId="com.aeassistant.panel" ExtensionBundleVersion="0.4.0"
+<ExtensionManifest Version="7.0" ExtensionBundleId="com.aeassistant.panel" ExtensionBundleVersion="0.5.0"
   ExtensionBundleName="AE Assistant" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <ExtensionList>
-    <Extension Id="com.aeassistant.panel.main" Version="0.4.0" />
+    <Extension Id="com.aeassistant.panel.main" Version="0.5.0" />
   </ExtensionList>
   <ExecutionEnvironment>
     <HostList>
@@ -36,7 +36,7 @@
           <Type>Panel</Type>
           <Menu>AE Assistant</Menu>
           <Geometry>
-            <Size><Height>620</Height><Width>360</Width></Size>
+            <Size><Height>640</Height><Width>620</Width></Size>
             <MinSize><Height>360</Height><Width>280</Width></MinSize>
           </Geometry>
         </UI>

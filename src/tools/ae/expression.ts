@@ -2,7 +2,8 @@ import { plural } from "../../lib/format";
 import { buildExpression, EXPR_PRESETS } from "../../presets/expressions";
 import { hostTool, undoHint } from "../host-tool";
 
-export type ExprInput = { preset: string; params?: Record<string, number>; linearIn?: boolean };
+export type ExprInput = { preset: string; params?: Record<string, number>; linearIn?: boolean; prop?: "pos" | "scale" | "rot" | "opacity" };
+const PROP_PATH = { pos: "ADBE Position", scale: "ADBE Scale", rot: "ADBE Rotate Z", opacity: "ADBE Opacity" } as const;
 
 export const expression = hostTool<ExprInput>({
   name: "ae.expressionPreset",
@@ -16,6 +17,7 @@ export const expression = hostTool<ExprInput>({
     properties: {
       preset: { type: "string", enum: EXPR_PRESETS.map((p) => p.id), description: "Какое выражение." },
       params: { type: "object", description: "Значения ползунков по ключам пресета, например { freq: 3, amp: 40 }." },
+      prop: { type: "string", enum: ["pos", "scale", "rot", "opacity"], description: "Принудительно на это свойство (иначе выделенные свойства или свойство по умолчанию)." },
       linearIn: { type: "boolean", default: true, description: "Для inertia/bounce/elastic: сделать вход в ключи линейным, иначе при Easy Ease эффекта не будет." },
     },
     required: ["preset"],
@@ -24,7 +26,8 @@ export const expression = hostTool<ExprInput>({
   toArgs: (i) => {
     const p = EXPR_PRESETS.find((x) => x.id === i.preset);
     if (!p) return { code: "" };
-    return buildExpression(p, i.params ?? {}, i.linearIn ?? true);
+    const b = buildExpression(p, i.params ?? {}, i.linearIn ?? true);
+    return i.prop ? { ...b, defaultPath: ["ADBE Transform Group", PROP_PATH[i.prop]], forceDefault: true } : b;
   },
   done: (r) => {
     const err = String(r.expressionError ?? "");

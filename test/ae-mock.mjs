@@ -63,8 +63,10 @@ export class Group {
   }
 }
 
-const effectFactory = (m) => () => new Group(m, [new Prop(m + " value", m.includes("Layer") ? 0 : m.includes("Checkbox") ? 0 : 0)]);
-const EFFECTS = ["ADBE Slider Control", "ADBE Checkbox Control", "ADBE Layer Control", "ADBE Angle Control", "ADBE Glo2", "ADBE Gaussian Blur 2", "ADBE Tint", "ADBE Fill", "ADBE Drop Shadow"];
+const effectFactory = (m) => () => new Group(m, m === "ADBE Drop Shadow"
+  ? [new Prop("Color", [0, 0, 0, 1], PVT.COLOR), new Prop("Opacity", 127), new Prop("Direction", 135), new Prop("Distance", 5), new Prop("Softness", 0)]
+  : [new Prop(m + " value", 0)]);
+const EFFECTS = ["ADBE Gaussian Blur 2", "ADBE Slider Control", "ADBE Checkbox Control", "ADBE Layer Control", "ADBE Angle Control", "ADBE Glo2", "ADBE Gaussian Blur 2", "ADBE Tint", "ADBE Fill", "ADBE Drop Shadow"];
 
 function transform(pos) {
   const p = new Prop("Position", [...pos], PVT.TwoD_SPATIAL, "ADBE Position");
@@ -131,8 +133,11 @@ export function makeContext(activeItem) {
     const l = new TextLayer({ name });
     const docProp = new Prop("Source Text", doc, PVT.TEXT_DOCUMENT, "ADBE Text Document");
     const animators = new Group("ADBE Text Animators", [], { addable: { "ADBE Text Animator": () => new Group("", [
-      new Group("ADBE Text Selectors", [], { addable: { "ADBE Text Selector": () => new Group("", [new Prop("Start", 0, PVT.OneD, "ADBE Text Percent Start"), new Prop("End", 100, PVT.OneD, "ADBE Text Percent End")]) } }),
-      new Group("ADBE Text Animator Properties", [], { addable: Object.fromEntries(["ADBE Text Opacity", "ADBE Text Position 3D", "ADBE Text Scale 3D", "ADBE Text Blur"].map((m) => [m, () => new Prop(m, 0, PVT.OneD, m)])) }),
+      new Group("ADBE Text Selectors", [], { addable: {
+        "ADBE Text Selector": () => new Group("", [new Prop("Start", 0, PVT.OneD, "ADBE Text Percent Start"), new Prop("End", 100, PVT.OneD, "ADBE Text Percent End")]),
+        "ADBE Text Expressible Selector": () => new Group("", [new Prop("Based On", 1, PVT.NO_VALUE, "ADBE Text Range Type2"), new Prop("Amount", [100, 100, 100], PVT.ThreeD, "ADBE Text Expressible Amount")]),
+      } }),
+      new Group("ADBE Text Animator Properties", [], { addable: Object.fromEntries(["ADBE Text Opacity", "ADBE Text Position 3D", "ADBE Text Scale 3D", "ADBE Text Blur", "ADBE Text Rotation", "ADBE Text Skew", "ADBE Text Tracking Amount"].map((m) => [m, () => new Prop(m, 0, PVT.OneD, m)])) }),
     ]) } });
     l.groups["ADBE Text Properties"] = new Group("ADBE Text Properties", [docProp, animators]);
     return l;

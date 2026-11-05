@@ -141,6 +141,30 @@ export const EXPR_PRESETS: ExprPreset[] = [
     defaultPath: SCALE, forceDefault: true, controlName: ctl("Пульс"),
     code: (n) => `${VEC}\nM(value, 1 + ${fx(n("amp"))} / 100 * Math.sin(time * ${fx(n("freq"))} * 2 * Math.PI))`,
   },
+  {
+    id: "sine", title: "Волна", hint: "Плавное колебание по синусоиде (по вертикали)",
+    params: [{ key: "amp", label: "Размах", value: 40, min: 0, max: 500, step: 1 }, { key: "freq", label: "Частота", value: 0.5, min: 0.05, max: 10, step: 0.05 }],
+    defaultPath: POS, controlName: ctl("Волна"),
+    code: (n) => `${VEC}\nvar o = ${fx(n("amp"))} * Math.sin(time * ${fx(n("freq"))} * 2 * Math.PI);\n(value instanceof Array) ? add(value, value.length == 3 ? [0, o, 0] : [0, o]) : value + o`,
+  },
+  {
+    id: "float", title: "Парение", hint: "Мягко плавает вверх-вниз",
+    params: [{ key: "amp", label: "Размах", value: 12, min: 0, max: 200, step: 1 }, { key: "freq", label: "Частота", value: 0.4, min: 0.05, max: 5, step: 0.05 }],
+    defaultPath: POS, forceDefault: true, controlName: ctl("Парение"),
+    code: (n) => `var o = ${fx(n("amp"))} * Math.sin(time * ${fx(n("freq"))} * 2 * Math.PI);\nadd(value, value.length == 3 ? [0, o, 0] : [0, o])`,
+  },
+  {
+    id: "flicker", title: "Мерцание", hint: "Случайное мигание прозрачности",
+    params: [{ key: "amount", label: "Сколько видно", value: 70, min: 0, max: 100, step: 1 }, { key: "speed", label: "Скорость", value: 12, min: 1, max: 60, step: 1 }],
+    defaultPath: ["ADBE Transform Group", "ADBE Opacity"], forceDefault: true, controlName: ctl("Мерцание"),
+    code: (n) => `seedRandom(Math.floor(time * ${fx(n("speed"))}), true);\nrandom(100) < ${fx(n("amount"))} ? value : value * 0.15`,
+  },
+  {
+    id: "autoFade", title: "Авто-проявление", hint: "Проявляется в начале слоя и гаснет в конце — двигайте слой как угодно",
+    params: [{ key: "dur", label: "Длительность", value: 0.5, min: 0.05, max: 5, step: 0.05 }],
+    defaultPath: ["ADBE Transform Group", "ADBE Opacity"], forceDefault: true, controlName: ctl("Проявление"),
+    code: (n) => `var d = Math.max(${fx(n("dur"))}, 0.001);\nvalue * Math.min(linear(time, inPoint, inPoint + d, 0, 1), linear(time, outPoint - d, outPoint, 1, 0))`,
+  },
 ];
 
 /** Аргументы для host: код + описание ползунков с текущими значениями. */

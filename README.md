@@ -39,22 +39,32 @@ GitHub Actions (`.github/workflows/release.yml`) на каждый push в `main
 
 ## Структура
 ```
-cep/CSXS/manifest.xml     манифест CEP-расширения
-host/src/*.jsx            ExtendScript, склеивается в host/index.jsx: AEA.run("<tool>", {...}) → JSON
-  00_core                 JSON, undo-группы, ease-помощники
-  10_animate 20_ease 30_expressions 40_create 50_text 60_elements 70_service 80_info
-src/tools/                инструменты { name, description, inputSchema, mutates, run } — их видят кнопки и ИИ
-src/presets/              кривые, выражения, эффекты, элементы
-src/sections/             вкладки панели
-src/chat/                 OpenAI-совместимый клиент (OpenRouter / Gemini / Ollama) с вызовом инструментов
-src/commands.ts           все действия для палитры Ctrl+K
-test/                     имитация объектной модели AE и тесты host
+cep/CSXS/manifest.xml       манифест CEP-расширения
+host/src/*.jsx              ExtendScript, склеивается в host/index.jsx: AEA.run("<tool>", {...}) → JSON
+  00_core                   JSON, undo-группы, ease-помощники
+  10_animate 15_motion      переходы слоёв (несколько свойств, сдвиг между слоями, пружина, размытие)
+  20_ease                   графики скорости (cubic-bezier ↔ KeyframeEase)
+  30_expressions            выражения и ползунки-эффекты
+  40_create 45_style        слои, эффекты, стили с параметрами
+  50_text 55_textfx         стиль текста, анимация по буквам/словам/строкам (Expression Selector)
+  60_elements 70_service    шейп-элементы, сервис
+  80_info                   сводки для чата и строки состояния
+src/presets/                пресеты вкладок: модель Preset {controls, preview, build} в types.ts, сводка в all.ts
+src/ui/Browser.tsx          вкладка-браузер: список слева, превью, ползунки, «Применить»
+src/tools/                  инструменты { name, description, inputSchema, mutates, run } — их видят кнопки и ИИ
+src/tools/preset-tool.ts    ae.applyPreset — ИИ применяет любой пресет по имени
+src/chat/                   OpenAI-совместимый клиент (OpenRouter / Gemini / Ollama) с вызовом инструментов
+test/                       имитация AE, тесты host, тесты кода выражений на имитации движка выражений
 ```
 
-### Как добавить возможность
+### Как добавить пресет
+Добавить объект в нужный `src/presets/*.ts`: `controls` (ползунки), `preview` (живое превью), `build` (какой инструмент и с какими аргументами).
+Палитра Ctrl+K и чат (`ae.applyPreset`) подхватят его сами.
+
+### Как добавить новую возможность в AE
 1. Функция в `host/src/NN_*.jsx`: `tools["ae.xxx"] = function (args) { … undoable(args.undoName, function () { … }) … }`.
 2. Инструмент в `src/tools/ae/*.ts` через `hostTool({...})` — с понятным `description` для модели.
-3. Строка в `src/tools/registry.ts`, плитка в нужной вкладке, команда в `src/commands.ts`, тест в `test/host.test.mjs`.
+3. Строка в `src/tools/registry.ts` (если нужен ИИ напрямую), тест в `test/host.test.mjs`.
 
 ### Правила для host-скриптов
 - Только ES3 (`var`, без `=>`, `let`, шаблонных строк, `forEach`/`map`) и только ASCII в коде:

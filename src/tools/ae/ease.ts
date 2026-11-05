@@ -1,5 +1,5 @@
 import { plural } from "../../lib/format";
-import { EASE_PRESETS, type Curve } from "../../presets/ease";
+import { ALL_EASE_PRESETS as EASE_PRESETS, type Curve } from "../../presets/ease";
 import { hostTool, undoHint } from "../host-tool";
 
 export type Manual = { outSpeed: number; outInfluence: number; inSpeed: number; inInfluence: number };
@@ -12,7 +12,7 @@ export const ease = hostTool<EaseInput>({
   title: (i) => `График: ${EASE_PRESETS.find((p) => p.id === i.preset)?.title ?? (i.manual ? "свои значения" : "своя кривая")}`,
   description:
     "Меняет график скорости между выделенными соседними ключами (настоящий KeyframeEase, без лишних ключей). " +
-    `preset — готовая кривая: ${EASE_PRESETS.map((p) => `${p.id} (${p.title}: ${p.hint})`).join("; ")}. ` +
+    `preset — готовая кривая: ${EASE_PRESETS.map((p) => `${p.id} (${p.title})`).join(", ")}. ` +
     "Или curve — cubic-bezier [x1,y1,x2,y2] как в CSS; или manual — speed/influence для выхода из первого и входа во второй ключ.",
   inputSchema: {
     type: "object",

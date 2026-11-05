@@ -30,7 +30,9 @@ function evaluate(code, prop, keys, time, sliders) {
     length: (v) => Math.hypot(...v), clamp: (v, a, b) => Math.min(b, Math.max(a, v)),
     add: op((a, b) => a + b), sub: op((a, b) => a - b), mul: op((a, b) => a * b),
     radiansToDegrees: (r) => (r * 180) / Math.PI, wiggle: () => prop.valueAt(time), loopOut: () => prop.valueAt(time),
-    toComp: (p) => p, anchorPoint: [0, 0],
+    toComp: (p) => p, anchorPoint: [0, 0], inPoint: 0, outPoint: 10,
+    seedRandom: () => {}, random: (n) => (n ?? 1) * 0.37,
+    linear: (t, t0, t1, a, b) => a + (b - a) * Math.min(1, Math.max(0, (t - t0) / (t1 - t0))),
   };
   return new Function(...Object.keys(env), `return eval(${JSON.stringify(code)})`)(...Object.values(env));
 }

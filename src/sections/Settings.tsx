@@ -46,8 +46,16 @@ export function SettingsSection() {
     }
   };
 
+  const ACCENTS = ["#9f18ec", "#0a84ff", "#ff6b2c", "#e0245e", "#30b06f", "#6e5cff", "#c8a24a"];
   return (
     <section className="section settings">
+      <div className="panel">
+        <div className="panel-title">Оформление</div>
+        <div className="swatches">
+          {ACCENTS.map((c) => <button key={c} className={`swatch${p.accent === c ? " on" : ""}`} style={{ background: c }} title={c} onClick={() => setPrefs({ accent: c })} />)}
+        </div>
+        <Seg value={p.theme} onChange={(v) => setPrefs({ theme: v })} options={[{ value: "dark", label: "Тёмная" }, { value: "light", label: "Светлая" }]} />
+      </div>
       <div className="panel">
         <div className="panel-title">ИИ-модель для чата</div>
         <Seg value={p.chatProvider} onChange={(v: ProviderId) => setPrefs({ chatProvider: v, chatModel: "", chatBaseUrl: "" })}

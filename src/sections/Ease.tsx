@@ -1,66 +1,90 @@
 import { useState } from "react";
 import { runTool } from "../lib/actions";
-import { EASE_PRESETS, type Curve } from "../presets/ease";
+import { useBusy } from "../lib/busy";
+import { useSelection } from "../lib/selection";
+import { setPrefs, usePrefs } from "../lib/store";
+import { ALL_EASE_PRESETS, type Curve } from "../presets/ease";
+import type { Preset } from "../presets/types";
 import { ease, readEase, type Manual } from "../tools/ae/ease";
-import { CurveThumb } from "../ui/AnimPreview";
 import { CurveEditor } from "../ui/CurveEditor";
-import { Btn, Num, Row, Seg, Tile } from "../ui/ui";
+import { Sidebar, useWide } from "../ui/Browser";
+import { Controls } from "../ui/Controls";
+import { Seg } from "../ui/ui";
 
+const r2 = (v: number) => Math.round(v * 100) / 100;
+
+/** Вкладка «Скорость»: библиотека кривых слева, редактор и cubic-bezier справа. */
 export function EaseSection() {
-  const [curve, setCurve] = useState<Curve>(EASE_PRESETS[0].curve);
+  const wide = useWide();
+  const busy = useBusy();
+  const sel = useSelection();
+  const { customCurves, lastPreset } = usePrefs();
+  const all = [...ALL_EASE_PRESETS, ...customCurves.map((c) => ({ ...c, hint: "Своя кривая", group: "Мои кривые" }))];
+  const list: Preset[] = all.map((p) => ({ id: p.id, title: p.title, subtitle: p.hint, group: p.group, controls: [] }));
+  const [cur, setCur] = useState(lastPreset.ease ?? all[0].id);
+  const [curve, setCurve] = useState<Curve>(all.find((p) => p.id === cur)?.curve ?? all[0].curve);
   const [mode, setMode] = useState<"curve" | "manual">("curve");
   const [manual, setManual] = useState<Manual>({ outSpeed: 0, outInfluence: 75, inSpeed: 0, inInfluence: 75 });
-  const set = (i: number, v: number) => setCurve(curve.map((c, j) => (j === i ? v : c)) as Curve);
-  const setM = (k: keyof Manual, v: number) => setManual({ ...manual, [k]: v });
+  const [open, setOpen] = useState(false);
+  const preset = all.find((p) => p.id === cur);
+  const edited = !preset || preset.curve.some((v, i) => v !== curve[i]);
 
+  const pick = (id: string) => {
+    const p = all.find((x) => x.id === id);
+    if (p) { setCur(id); setCurve(p.curve); setMode("curve"); setOpen(false); setPrefs({ lastPreset: { ...lastPreset, ease: id } }); }
+  };
   const read = async () => {
     const r = await runTool(readEase, {});
-    if (r?.ok && r.data && r.data.ok) {
-      setCurve((r.data.curve as number[]).map((v) => Math.round(v * 100) / 100) as Curve);
-      setManual(r.data.manual as Manual);
-    }
+    if (r?.ok && r.data?.ok) { setCurve((r.data.curve as number[]).map(r2) as Curve); setManual(r.data.manual as Manual); }
   };
+  const save = () => {
+    const title = `Кривая ${customCurves.length + 1}`;
+    const id = `my${Date.now()}`;
+    setPrefs({ customCurves: [...customCurves, { id, title, curve }] });
+    setCur(id);
+  };
+  const remove = () => { setPrefs({ customCurves: customCurves.filter((c) => c.id !== cur) }); pick(all[0].id); };
+  const isCustom = customCurves.some((c) => c.id === cur);
+  const sidebar = <Sidebar title="Кривые" presets={list} current={cur} onPick={pick} favKey="ease" />;
 
   return (
-    <section className="section">
-      <div className="toolbar">
-        <Seg value={mode} onChange={setMode} options={[{ value: "curve", label: "Кривая" }, { value: "manual", label: "Speed / Influence" }]} />
-        <span className="hint">на выделенные ключи</span>
-      </div>
-
-      {mode === "curve" ? (
-        <div className="ease-editor">
-          <CurveEditor curve={curve} onChange={setCurve} />
-          <div className="ease-fields">
-            <Num label="x1" value={curve[0]} min={0} max={1} step={0.01} onChange={(v) => set(0, Math.min(1, Math.max(0, v)))} />
-            <Num label="y1" value={curve[1]} step={0.01} onChange={(v) => set(1, v)} />
-            <Num label="x2" value={curve[2]} min={0} max={1} step={0.01} onChange={(v) => set(2, Math.min(1, Math.max(0, v)))} />
-            <Num label="y2" value={curve[3]} step={0.01} onChange={(v) => set(3, v)} />
+    <div className={`browser${wide ? "" : " narrow"}`}>
+      {wide && sidebar}
+      <section className="detail">
+        <header className="detail-head">
+          {wide ? <div><h2>{edited ? "Своя кривая" : preset?.title}</h2><p>{edited ? "Изменена вручную" : preset?.hint}</p></div>
+            : <button className="picker" onClick={() => setOpen(!open)}><span><b>{edited ? "Своя кривая" : preset?.title}</b><small>{preset?.hint}</small></span><i>▾</i></button>}
+          <div className="inline">
+            <button className="pill" onClick={read} disabled={busy} title="Считать график с первой выделенной пары ключей">Считать</button>
+            {isCustom ? <button className="pill" onClick={remove}>Удалить</button> : <button className="pill" onClick={save} title="Сохранить в «Мои кривые»">Сохранить</button>}
           </div>
+        </header>
+        {!wide && open && <div className="picker-pop" onMouseLeave={() => setOpen(false)}>{sidebar}</div>}
+        <div className="detail-body">
+          <Seg value={mode} onChange={setMode} options={[{ value: "curve", label: "Кривая" }, { value: "manual", label: "Speed / Influence" }]} />
+          {mode === "curve" ? (
+            <>
+              <div className="stage curve-stage"><CurveEditor curve={curve} onChange={setCurve} /></div>
+              <div className="code-row">
+                <code>cubic-bezier({curve.map(r2).join(", ")})</code>
+                <button className="pill" onClick={() => navigator.clipboard?.writeText(`cubic-bezier(${curve.map(r2).join(", ")})`)}>Копировать</button>
+              </div>
+            </>
+          ) : (
+            <Controls values={manual} onChange={(v) => setManual(v as Manual)} controls={[
+              { type: "slider", key: "outInfluence", label: "Выход из 1-го ключа · Influence", min: 0.1, max: 100, step: 0.1, unit: "%", value: 75 },
+              { type: "slider", key: "outSpeed", label: "Выход · Speed", min: -5000, max: 5000, step: 1, value: 0 },
+              { type: "slider", key: "inInfluence", label: "Вход во 2-й ключ · Influence", min: 0.1, max: 100, step: 0.1, unit: "%", value: 75 },
+              { type: "slider", key: "inSpeed", label: "Вход · Speed", min: -5000, max: 5000, step: 1, value: 0 },
+            ]} />
+          )}
+          <p className="hint">Тяните ручки, чтобы сделать свою кривую. Применяется настоящим ease, без лишних ключей.</p>
         </div>
-      ) : (
-        <div className="manual-grid">
-          <b>Выход из 1-го ключа</b><b>Вход во 2-й ключ</b>
-          <Num label="Influence" suffix="%" value={manual.outInfluence} min={0.1} max={100} onChange={(v) => setM("outInfluence", v)} />
-          <Num label="Influence" suffix="%" value={manual.inInfluence} min={0.1} max={100} onChange={(v) => setM("inInfluence", v)} />
-          <Num label="Speed" value={manual.outSpeed} onChange={(v) => setM("outSpeed", v)} hint="Единиц в секунду (px/с для позиции)" />
-          <Num label="Speed" value={manual.inSpeed} onChange={(v) => setM("inSpeed", v)} hint="Единиц в секунду (px/с для позиции)" />
-        </div>
-      )}
-
-      <Row between>
-        <Btn onClick={read} hint="Считать график с первой выделенной пары ключей">Считать с ключей</Btn>
-        <Btn primary onClick={() => runTool(ease, mode === "curve" ? { curve } : { manual })} hint="Применить к выделенным парам ключей">Применить</Btn>
-      </Row>
-
-      <div className="grid grid-tight">
-        {EASE_PRESETS.map((p) => (
-          <Tile key={p.id} title={p.title} hint={`${p.title}: ${p.hint}. Клик — применить к выделенным ключам`} compact
-            onClick={() => { setCurve(p.curve); setMode("curve"); runTool(ease, { preset: p.id }); }}>
-            <CurveThumb curve={p.curve} />
-          </Tile>
-        ))}
-      </div>
-    </section>
+        <footer className="detail-foot">
+          <span>{sel.keys ? `Выделено ключей: ${sel.keys}` : "Выделите минимум два соседних ключа"}</span>
+          <button className="btn primary" disabled={busy} onClick={() => runTool(ease, mode === "curve" ? { curve } : { manual })}>Применить</button>
+        </footer>
+      </section>
+    </div>
   );
 }
