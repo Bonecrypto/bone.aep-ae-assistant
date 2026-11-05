@@ -8,7 +8,7 @@
  *   { ok: true, ... } или { ok: false, code: "NO_COMP", ... }
  */
 (function (global) {
-  if (global.AEA && global.AEA.__version === "0.1.0") return;
+  if (global.AEA && global.AEA.__version === "0.2.0") return;
 
   // ---------- JSON.stringify для ES3 ----------
   function quote(s) {
@@ -54,22 +54,33 @@
   };
 
   /*
-   * ae.flyIn — влёт выделенных слоёв из-за края кадра.
-   * args: { direction: "left", duration: 0.6, undoName: "..." }
-   * Ключи ставятся от текущего времени (CTI): t0 = за кадром, t1 = текущая позиция.
-   * Ease — настоящий KeyframeEase (быстрый старт, мягкая остановка).
+   * ae.animate — влёт/улёт выделенных слоёв.
+   * args: {
+   *   kind: "slide" | "fade" | "scale",
+   *   mode: "in" | "out",
+   *   direction: "left" | "right" | "up" | "down"   (только для slide),
+   *   duration: 0.6, undoName: "..."
+   * }
+   * in:  t0 = CTI (за кадром / 0%) -> t1 = CTI + duration (текущее значение)
+   * out: t0 = CTI (текущее значение) -> t1 = CTI + duration (за кадром / 0%)
+   * Ease — настоящий KeyframeEase: влёт тормозит в конце, улёт разгоняется в начале.
    */
-  tools["ae.flyIn"] = function (args) {
+  var KINDS = { slide: 1, fade: 1, scale: 1 };
+  var DIRS = { left: 1, right: 1, up: 1, down: 1 };
+
+  tools["ae.animate"] = function (args) {
     var comp = activeComp();
     if (!comp) return fail("NO_COMP");
     var layers = comp.selectedLayers;
     if (!layers || layers.length === 0) return fail("NO_SELECTION");
-    if (args.direction !== "left") return fail("BAD_ARGS", { field: "direction" });
+    if (!KINDS[args.kind]) return fail("BAD_ARGS", { field: "kind" });
+    if (args.mode !== "in" && args.mode !== "out") return fail("BAD_ARGS", { field: "mode" });
+    if (args.kind === "slide" && !DIRS[args.direction]) return fail("BAD_ARGS", { field: "direction" });
 
     var duration = args.duration > 0 ? args.duration : 0.6;
-    var margin = 20;
     var t0 = comp.time;
     var t1 = t0 + duration;
+    var isIn = args.mode === "in";
     var changed = 0;
     var skipped = { locked: 0, noPosition: 0, expression: 0 };
 
@@ -79,39 +90,18 @@
         var layer = layers[i];
         if (layer.locked) { skipped.locked++; continue; }
         if (layer instanceof CameraLayer || layer instanceof LightLayer) { skipped.noPosition++; continue; }
-
         var tr = layer.property("ADBE Transform Group");
-        var pos = tr ? tr.property("ADBE Position") : null;
-        if (!pos) { skipped.noPosition++; continue; }
+        if (!tr) { skipped.noPosition++; continue; }
 
-        var sep = pos.dimensionsSeparated;
-        var xProp = sep ? tr.property("ADBE Position_0") : pos;
-        if (xProp.expressionEnabled && xProp.expression !== "") { skipped.expression++; continue; }
+        var target = targetFor(args, layer, tr, comp, t0);
+        if (!target) { skipped.noPosition++; continue; }
+        if (target.prop.expressionEnabled && target.prop.expression !== "") { skipped.expression++; continue; }
 
-        var endVal = xProp.valueAtTime(t0, true);
-        var endX = sep ? endVal : endVal[0];
-        var startX = offscreenLeftX(layer, tr, comp, t0, endX, margin);
-
-        var startVal;
-        if (sep) {
-          startVal = startX;
-        } else {
-          startVal = [];
-          for (var d = 0; d < endVal.length; d++) startVal.push(endVal[d]);
-          startVal[0] = startX;
-        }
-
-        xProp.setValueAtTime(t0, startVal);
-        xProp.setValueAtTime(t1, endVal);
-
-        var k0 = xProp.nearestKeyIndex(t0);
-        var k1 = xProp.nearestKeyIndex(t1);
-        var B = KeyframeInterpolationType.BEZIER;
-        xProp.setInterpolationTypeAtKey(k0, xProp.keyInInterpolationType(k0), B);
-        xProp.setInterpolationTypeAtKey(k1, B, xProp.keyOutInterpolationType(k1));
-        // Позиция (и X Position) — одна KeyframeEase на ключ.
-        xProp.setTemporalEaseAtKey(k0, xProp.keyInTemporalEase(k0), [new KeyframeEase(0, 15)]);
-        xProp.setTemporalEaseAtKey(k1, [new KeyframeEase(0, 85)], xProp.keyOutTemporalEase(k1));
+        var restVal = target.prop.valueAtTime(t0, true);
+        var offVal = target.off(restVal);
+        target.prop.setValueAtTime(t0, isIn ? offVal : restVal);
+        target.prop.setValueAtTime(t1, isIn ? restVal : offVal);
+        applyEase(target.prop, t0, t1, isIn);
         changed++;
       }
     } finally {
@@ -122,30 +112,88 @@
     return { ok: true, changed: changed, skipped: skipped, start: t0, end: t1 };
   };
 
-  // X позиции, при которой правый край слоя оказывается левее кадра.
-  function offscreenLeftX(layer, tr, comp, t, endX, margin) {
-    var fallback = endX - (comp.width + margin);
+  // Совместимость с панелью 0.1.0
+  tools["ae.flyIn"] = function (args) {
+    return tools["ae.animate"]({ kind: "slide", mode: "in", direction: args.direction, duration: args.duration, undoName: args.undoName });
+  };
+
+  // Какое свойство анимировать и как получить «спрятанное» значение из текущего.
+  function targetFor(args, layer, tr, comp, t) {
+    if (args.kind === "fade") {
+      return { prop: tr.property("ADBE Opacity"), off: function () { return 0; } };
+    }
+    if (args.kind === "scale") {
+      return { prop: tr.property("ADBE Scale"), off: function (v) {
+        var r = []; for (var d = 0; d < v.length; d++) r.push(0); return r;
+      } };
+    }
+    var pos = tr.property("ADBE Position");
+    if (!pos) return null;
+    var horizontal = args.direction === "left" || args.direction === "right";
+    var axis = horizontal ? 0 : 1;
+    var sep = pos.dimensionsSeparated;
+    var prop = sep ? tr.property(horizontal ? "ADBE Position_0" : "ADBE Position_1") : pos;
+    return { prop: prop, off: function (v) {
+      var cur = sep ? v : v[axis];
+      var hidden = offscreen(layer, tr, comp, t, args.direction, cur);
+      if (sep) return hidden;
+      var r = []; for (var d = 0; d < v.length; d++) r.push(v[d]);
+      r[axis] = hidden;
+      return r;
+    } };
+  }
+
+  // Координата по оси, при которой слой целиком уходит за край кадра.
+  function offscreen(layer, tr, comp, t, dir, cur) {
+    var margin = 20;
+    var size = dir === "left" || dir === "right" ? comp.width : comp.height;
+    var sign = dir === "left" || dir === "up" ? -1 : 1;
+    var fallback = cur + sign * (size + margin);
     if (layer.parent !== null || layer.threeDLayer) return fallback;
     try {
+      var rot = tr.property("ADBE Rotate Z").valueAtTime(t, false);
+      if (rot % 360 !== 0) return fallback;
       var rect = layer.sourceRectAtTime(t, false);
       var anchor = tr.property("ADBE Anchor Point").valueAtTime(t, false);
       var scale = tr.property("ADBE Scale").valueAtTime(t, false);
-      var rot = tr.property("ADBE Rotate Z").valueAtTime(t, false);
-      if (rot % 360 !== 0) return fallback;
-      var sx = scale[0] / 100;
-      var a = (rect.left - anchor[0]) * sx;
-      var b = (rect.left + rect.width - anchor[0]) * sx;
-      var right = a > b ? a : b;
-      var x = -margin - right;
-      return x < endX ? x : fallback;
+      var axis = dir === "left" || dir === "right" ? 0 : 1;
+      var start = axis === 0 ? rect.left : rect.top;
+      var len = axis === 0 ? rect.width : rect.height;
+      var k = scale[axis] / 100;
+      var a = (start - anchor[axis]) * k;
+      var b = (start + len - anchor[axis]) * k;
+      var lo = a < b ? a : b;
+      var hi = a < b ? b : a;
+      var v = sign < 0 ? -margin - hi : size + margin - lo;
+      return (sign < 0 ? v < cur : v > cur) ? v : fallback;
     } catch (e) {
       return fallback;
     }
   }
 
+  // Bezier + KeyframeEase. Количество объектов ease берём из самого ключа
+  // (1 для пространственных и 1D, 2/3 для TwoD/ThreeD — см. setTemporalEaseAtKey).
+  function easeList(prop, k, influence) {
+    var n = prop.keyInTemporalEase(k).length;
+    var r = [];
+    for (var d = 0; d < n; d++) r.push(new KeyframeEase(0, influence));
+    return r;
+  }
+  function applyEase(prop, t0, t1, isIn) {
+    var k0 = prop.nearestKeyIndex(t0);
+    var k1 = prop.nearestKeyIndex(t1);
+    var B = KeyframeInterpolationType.BEZIER;
+    var startInf = isIn ? 15 : 85;
+    var endInf = isIn ? 85 : 15;
+    prop.setInterpolationTypeAtKey(k0, prop.keyInInterpolationType(k0), B);
+    prop.setInterpolationTypeAtKey(k1, B, prop.keyOutInterpolationType(k1));
+    prop.setTemporalEaseAtKey(k0, prop.keyInTemporalEase(k0), easeList(prop, k0, startInf));
+    prop.setTemporalEaseAtKey(k1, easeList(prop, k1, endInf), prop.keyOutTemporalEase(k1));
+  }
+
   // ---------- Точка входа ----------
   global.AEA = {
-    __version: "0.1.0",
+    __version: "0.2.0",
     run: function (name, args) {
       try {
         var fn = tools[name];

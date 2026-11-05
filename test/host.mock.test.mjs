@@ -7,7 +7,7 @@ import vm from "node:vm";
 
 class KeyframeEase { constructor(speed, influence) { this.speed = speed; this.influence = influence; } }
 class Prop {
-  constructor(value) { this.value = value; this.keys = []; this.expression = ""; this.expressionEnabled = false; }
+  constructor(value, easeDims = 1) { this.value = value; this.easeDims = easeDims; this.keys = []; this.expression = ""; this.expressionEnabled = false; }
   valueAtTime(t) {
     if (!this.keys.length) return this.value;
     // ступенчатая интерполяция достаточна для теста
@@ -15,7 +15,8 @@ class Prop {
   }
   setValueAtTime(t, v) {
     const i = this.keys.findIndex((k) => k.t === t);
-    const key = { t, v, inI: 6612, outI: 6612, inE: [new KeyframeEase(0, 16.7)], outE: [new KeyframeEase(0, 16.7)] };
+    const e = () => Array.from({ length: this.easeDims }, () => new KeyframeEase(0, 16.7));
+    const key = { t, v, inI: 6612, outI: 6612, inE: e(), outE: e() };
     if (i >= 0) this.keys[i] = key; else { this.keys.push(key); this.keys.sort((a, b) => a.t - b.t); }
   }
   nearestKeyIndex(t) { let best = 0; this.keys.forEach((k, i) => { if (Math.abs(k.t - t) < Math.abs(this.keys[best].t - t)) best = i; }); return best + 1; }
@@ -25,7 +26,7 @@ class Prop {
   setInterpolationTypeAtKey(i, a, b) { Object.assign(this.key(i), { inI: a, outI: b }); }
   keyInTemporalEase(i) { return this.key(i).inE; }
   keyOutTemporalEase(i) { return this.key(i).outE; }
-  setTemporalEaseAtKey(i, a, b) { if (a.length !== 1 || b.length !== 1) throw new Error("ease dims"); Object.assign(this.key(i), { inE: a, outE: b }); }
+  setTemporalEaseAtKey(i, a, b) { if (a.length !== this.easeDims || b.length !== this.easeDims) throw new Error("ease dims"); Object.assign(this.key(i), { inE: a, outE: b }); }
 }
 class Group { constructor(map) { this.map = map; } property(n) { return this.map[n] ?? null; } }
 class AVLayer {
@@ -34,7 +35,8 @@ class AVLayer {
     const p = new Prop([...pos]); p.dimensionsSeparated = sep;
     this.tr = new Group({
       "ADBE Position": p, "ADBE Position_0": new Prop(pos[0]), "ADBE Position_1": new Prop(pos[1]),
-      "ADBE Anchor Point": new Prop([0, 0]), "ADBE Scale": new Prop([100, 100]), "ADBE Rotate Z": new Prop(0),
+      "ADBE Anchor Point": new Prop([0, 0]), "ADBE Scale": new Prop([100, 100, 100], 3), "ADBE Rotate Z": new Prop(0),
+      "ADBE Opacity": new Prop(100),
     });
   }
   property(n) { return n === "ADBE Transform Group" ? this.tr : null; }
@@ -96,4 +98,44 @@ test("исключение внутри действия не оставляет
   const r = h.run("ae.flyIn", { direction: "left" });
   assert.equal(r.code, "EXCEPTION");
   assert.deepEqual(h.undo, ["begin:AE Assistant", "end"]);
+});
+
+const animate = (args, layer = new AVLayer()) => {
+  const h = load(new CompItem([layer]));
+  return { r: h.run("ae.animate", { duration: 0.5, ...args }), layer, undo: h.undo };
+};
+const keysOf = (l, n) => JSON.parse(JSON.stringify(l.tr.property(n).keys.map((k) => k.v)));
+
+test("слайд во все стороны: слой уходит ровно за край кадра", () => {
+  // слой 200x100 с якорем в центре, позиция (960, 540), кадр 1920x1080, отступ 20
+  assert.equal(keysOf(animate({ kind: "slide", mode: "in", direction: "right" }).layer, "ADBE Position")[0][0], 1920 + 20 + 100);
+  assert.equal(keysOf(animate({ kind: "slide", mode: "in", direction: "up" }).layer, "ADBE Position")[0][1], -20 - 50);
+  assert.equal(keysOf(animate({ kind: "slide", mode: "in", direction: "down" }).layer, "ADBE Position")[0][1], 1080 + 20 + 50);
+});
+
+test("улёт: сначала текущее значение, потом за кадр, ease наоборот", () => {
+  const { r, layer } = animate({ kind: "slide", mode: "out", direction: "left" });
+  assert.equal(r.ok, true);
+  const p = layer.tr.property("ADBE Position");
+  assert.deepEqual(p.keys[0].v, [960, 540]);
+  assert.equal(p.keys[1].v[0], -120);
+  assert.equal(p.keys[0].outE[0].influence, 85);
+  assert.equal(p.keys[1].inE[0].influence, 15);
+});
+
+test("fade in: прозрачность 0 → текущая", () => {
+  const { layer } = animate({ kind: "fade", mode: "in" });
+  assert.deepEqual(keysOf(layer, "ADBE Opacity"), [0, 100]);
+});
+
+test("scale out: 3 объекта ease для трёхмерного масштаба", () => {
+  const { r, layer } = animate({ kind: "scale", mode: "out" });
+  assert.equal(r.ok, true);
+  assert.deepEqual(keysOf(layer, "ADBE Scale"), [[100, 100, 100], [0, 0, 0]]);
+  assert.equal(layer.tr.property("ADBE Scale").keys[0].outE.length, 3);
+});
+
+test("неверные параметры не открывают undo-группу", () => {
+  const { r, undo } = animate({ kind: "slide", mode: "in", direction: "diagonal" });
+  assert.equal(r.code, "BAD_ARGS"); assert.deepEqual(undo, []);
 });

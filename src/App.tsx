@@ -1,21 +1,29 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { callHost, inAE } from "./lib/cep";
-import { tools } from "./tools/registry";
-import type { Tool } from "./tools/types";
+import { animate, animTitle, type AnimateInput, type AnimMode } from "./tools/ae/animate";
 import { stubProvider, type ChatMessage } from "./chat/provider";
-import { IconArrowRight, IconChat, IconSend, IconSparkles } from "./ui/icons";
+import { AnimPreview } from "./ui/AnimPreview";
+import { IconChat, IconSend, IconSparkles } from "./ui/icons";
 
 type Tab = "actions" | "chat";
 type Status = { kind: "idle" | "busy" | "ok" | "error"; text: string };
 
+// Удобства для одного пользователя: помним вкладку, режим и длительность.
+const load = <T,>(key: string, fallback: T): T => {
+  try { const v = localStorage.getItem(`aea.${key}`); return v === null ? fallback : (JSON.parse(v) as T); } catch { return fallback; }
+};
+const save = (key: string, v: unknown) => { try { localStorage.setItem(`aea.${key}`, JSON.stringify(v)); } catch { /* нет хранилища */ } };
+
 export function App() {
-  const [tab, setTab] = useState<Tab>("actions");
+  const [tab, setTab] = useState<Tab>(() => load<Tab>("tab", "actions"));
   const [status, setStatus] = useState<Status>({ kind: "idle", text: "Подключение к After Effects…" });
 
+  useEffect(() => save("tab", tab), [tab]);
   useEffect(() => {
     callHost("system.ping").then((r) => {
-      if (r.ok) setStatus({ kind: "idle", text: inAE() ? `After Effects ${String(r.appVersion)} · готов` : "Режим браузера: AE не подключён" });
-      else setStatus({ kind: "error", text: "Скрипт панели не загрузился в AE. Переоткройте панель." });
+      if (!r.ok) { setStatus({ kind: "error", text: "Скрипт панели не загрузился в AE. Переоткройте панель." }); return; }
+      const ver = String(r.appVersion).split("x")[0];
+      setStatus({ kind: "idle", text: inAE() ? `After Effects ${ver} · готов` : "Режим браузера: AE не подключён" });
     });
   }, []);
 
@@ -33,7 +41,7 @@ export function App() {
         {tab === "actions" ? <Actions setStatus={setStatus} /> : <Chat />}
       </main>
 
-      <footer className={`status status-${status.kind}`} role="status">
+      <footer className={`status status-${status.kind}`} role="status" title={status.text}>
         <span className="status-dot" />
         <span className="status-text">{status.text}</span>
       </footer>
@@ -49,33 +57,72 @@ function TabButton(props: { active: boolean; onClick: () => void; title: string;
   );
 }
 
-function Actions({ setStatus }: { setStatus: (s: Status) => void }) {
-  const [busy, setBusy] = useState<string | null>(null);
+const PRESETS: Omit<AnimateInput, "mode" | "duration">[] = [
+  { kind: "slide", direction: "left" },
+  { kind: "slide", direction: "right" },
+  { kind: "slide", direction: "up" },
+  { kind: "slide", direction: "down" },
+  { kind: "fade" },
+  { kind: "scale" },
+];
+const DURATIONS = [0.3, 0.6, 1];
 
-  const run = async (tool: Tool<any>, input: Record<string, unknown>) => {
-    setBusy(tool.name);
-    setStatus({ kind: "busy", text: `${tool.title}…` });
+function Actions({ setStatus }: { setStatus: (s: Status) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [mode, setMode] = useState<AnimMode>(() => load<AnimMode>("mode", "in"));
+  const [duration, setDuration] = useState<number>(() => load("duration", 0.6));
+  useEffect(() => save("mode", mode), [mode]);
+  useEffect(() => save("duration", duration), [duration]);
+
+  const run = async (input: AnimateInput) => {
+    if (busy) return;
+    setBusy(true);
+    setStatus({ kind: "busy", text: `${animTitle(input)}…` });
     try {
-      const r = await tool.run(input);
+      const r = await animate.run(input);
       setStatus({ kind: r.ok ? "ok" : "error", text: r.message });
     } catch (e) {
       setStatus({ kind: "error", text: `Не удалось выполнить: ${String(e)}` });
     } finally {
-      setBusy(null);
+      setBusy(false);
     }
   };
 
   return (
     <section className="actions">
-      <div className="chips"><span className="chip active">Анимации</span></div>
+      <div className="toolbar">
+        <div className="segmented" role="radiogroup" aria-label="Режим">
+          {(["in", "out"] as const).map((m) => (
+            <button key={m} role="radio" aria-checked={mode === m} className={mode === m ? "on" : ""} onClick={() => setMode(m)}
+              title={m === "in" ? "Слой появляется: ключи от текущего времени к его текущему положению" : "Слой исчезает: от текущего положения за кадр"}>
+              {m === "in" ? "Влёт" : "Улёт"}
+            </button>
+          ))}
+        </div>
+        <div className="segmented" role="radiogroup" aria-label="Длительность">
+          {DURATIONS.map((d) => (
+            <button key={d} role="radio" aria-checked={duration === d} className={duration === d ? "on" : ""} onClick={() => setDuration(d)}
+              title={`Длительность ${String(d).replace(".", ",")} с`}>
+              {String(d).replace(".", ",")} с
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="grid">
-        {tools.map((t) => (
-          <button key={t.name} className="tile" disabled={busy !== null} onClick={() => run(t, { direction: "left" })}
-            title={`${t.title}: выделенные слои влетают из-за левого края в текущую позицию за 0,6 с от текущего времени. Один Ctrl+Z отменит.`}>
-            <div className="preview"><span className="ghost" /><span className="box" /></div>
-            <div className="tile-label"><IconArrowRight />{busy === t.name ? "Применяю…" : t.title}</div>
-          </button>
-        ))}
+        {PRESETS.map((p) => {
+          const input: AnimateInput = { ...p, mode, duration };
+          const title = animTitle(input);
+          const onKey = (e: KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); run(input); } };
+          return (
+            <div key={title} role="button" tabIndex={0} aria-disabled={busy} className={`tile ${busy ? "disabled" : ""}`}
+              onClick={() => run(input)} onKeyDown={onKey}
+              title={`${title}: выделенные слои, от текущего времени, ${String(duration).replace(".", ",")} с. Один Ctrl+Z отменит.`}>
+              <AnimPreview input={input} />
+              <div className="tile-label">{title}</div>
+            </div>
+          );
+        })}
       </div>
     </section>
   );

@@ -21,6 +21,8 @@ body {
   user-select: none;
 }
 button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; }
+button:focus, [role="button"]:focus { outline: none; }
+button:focus-visible, [role="button"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 button:disabled { cursor: default; opacity: .5; }
 
 .app { display: flex; flex-direction: column; height: 100%; }
@@ -36,31 +38,35 @@ button:disabled { cursor: default; opacity: .5; }
 .main { flex: 1; min-height: 0; padding: 0 12px; display: flex; flex-direction: column; }
 
 .actions { display: flex; flex-direction: column; gap: 10px; min-height: 0; flex: 1; }
-.chips { display: flex; gap: 6px; flex-wrap: wrap; }
-.chip { padding: 4px 10px; border-radius: 999px; background: var(--surface); color: var(--muted); font-size: 12px; }
-.chip.active { background: var(--accent-soft); color: #d9a6ff; }
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; align-content: start; }
-.tile {
-  display: flex; flex-direction: column; gap: 8px; padding: 8px; text-align: left;
-  background: var(--surface); border-radius: var(--radius); outline: 1px solid transparent;
-  transition: outline-color .15s, transform .1s;
-}
-.tile:hover:not(:disabled) { outline-color: var(--accent); }
-.tile:active:not(:disabled) { transform: scale(.98); }
-.tile:focus-visible { outline: 2px solid var(--accent); }
-.tile-label { display: flex; align-items: center; gap: 6px; font-weight: 500; }
-.tile-label svg { color: var(--accent); width: 15px; height: 15px; }
+.toolbar { display: flex; gap: 8px; flex-wrap: wrap; justify-content: space-between; }
+.segmented { display: flex; padding: 2px; background: var(--surface); border-radius: 9px; }
+.segmented button { padding: 4px 10px; border-radius: 7px; color: var(--muted); font-size: 12px; white-space: nowrap; }
+.segmented button:hover { color: var(--text); }
+.segmented button.on { background: var(--accent-soft); color: #e2bcff; }
 
-.preview { position: relative; height: 56px; border-radius: 8px; background: #111113; overflow: hidden; }
-.preview .box, .preview .ghost {
-  position: absolute; top: 50%; left: 50%; width: 20px; height: 20px; margin: -10px 0 0 -10px; border-radius: 5px;
+.grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; align-content: start; }
+.tile {
+  display: block; padding: 6px; border-radius: var(--radius); background: var(--surface); cursor: pointer;
+  box-shadow: inset 0 0 0 1px transparent; transition: box-shadow .15s, transform .1s;
 }
-.preview .ghost { border: 1px dashed #555; }
-.preview .box { background: var(--accent); transform: translateX(0); }
-.tile:hover .preview .box { animation: fly-left 1.4s cubic-bezier(.15, 0, .15, 1) infinite; }
-@keyframes fly-left {
-  0% { transform: translateX(-80px); }
-  45%, 100% { transform: translateX(0); }
+.tile:hover { box-shadow: inset 0 0 0 1px var(--accent); }
+.tile:active { transform: scale(.98); }
+.tile.disabled { opacity: .5; pointer-events: none; }
+.tile-label { margin-top: 6px; padding: 0 2px; font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.preview { display: block; width: 100%; height: auto; }
+.pv-bg { fill: #121214; }
+.pv-frame { fill: none; stroke: #4a4a50; stroke-width: 1; stroke-dasharray: 2 2; }
+.pv-box { fill: var(--accent); transform-box: fill-box; transform-origin: center; }
+.tile:hover .pv-in, .tile:focus-visible .pv-in { animation: pv-in 1.6s cubic-bezier(.15, 0, .15, 1) infinite; }
+.tile:hover .pv-out, .tile:focus-visible .pv-out { animation: pv-out 1.6s cubic-bezier(.85, 0, .85, 1) infinite; }
+@keyframes pv-in {
+  0% { transform: translate(var(--dx), var(--dy)) scale(var(--s0)); opacity: var(--o0); }
+  50%, 100% { transform: translate(0, 0) scale(1); opacity: 1; }
+}
+@keyframes pv-out {
+  0%, 15% { transform: translate(0, 0) scale(1); opacity: 1; }
+  65%, 100% { transform: translate(var(--dx), var(--dy)) scale(var(--s0)); opacity: var(--o0); }
 }
 
 .chat { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
