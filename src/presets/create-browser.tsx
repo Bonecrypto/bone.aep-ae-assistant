@@ -1,6 +1,7 @@
 import { addEffect, createLayer, element } from "../tools/ae/create";
 import { precompose, sequence, labelByType, removeUnused } from "../tools/ae/service";
 import { motionBlur } from "../tools/ae/animate";
+import { glass } from "../tools/ae/glass";
 import { ELEMENT_ITEMS, EFFECT_ITEMS, LAYER_ITEMS } from "./create";
 import { layersWord } from "../lib/format";
 import { act, slider, type Preset } from "./types";
@@ -16,7 +17,48 @@ const shapeStage = (d: string, color: string, width: number) => ({
 });
 const layerStage = (label: string, bg: string) => ({ kind: "node" as const, node: <div className="style-stage"><div className="style-card" style={{ background: bg }}>{label}</div></div> });
 
+// Превью стекла: настоящее размытие фона (backdrop-filter) поверх цветных пятен.
+const glassStage = (v: Record<string, any>, label: string) => {
+  const k = 0.32; // px AE -> px превью
+  return {
+    kind: "node" as const,
+    node: (
+      <div className="glass-stage">
+        <span className="blob b1" /><span className="blob b2" /><span className="blob b3" />
+        <div className="glass-card" style={{
+          width: Math.min(260, v.width * k), height: Math.min(130, v.height * k), borderRadius: Math.min(v.radius * k, 65),
+          backdropFilter: `blur(${v.frost / 4}px) brightness(1.08)`, WebkitBackdropFilter: `blur(${v.frost / 4}px)`,
+          background: `${v.color ?? "#ffffff"}${Math.round(v.tint * 2.55).toString(16).padStart(2, "0")}`,
+          border: v.stroke > 0 ? `${Math.max(1, v.stroke / 2)}px solid rgba(255,255,255,.45)` : "none",
+          boxShadow: v.shadow > 0 ? `0 8px 24px rgba(0,0,0,${v.shadow / 140})` : "none",
+        }}>{label}</div>
+      </div>
+    ),
+  };
+};
+
+const glassControls = (w: number, h: number, r: number, withColor: boolean) => [
+  slider("width", "Ширина", w, 40, 3000, 1, "px"), slider("height", "Высота", h, 20, 2000, 1, "px"),
+  slider("radius", "Скругление", r, 0, 500, 1, "px"), slider("frost", "Матовость", 30, 0, 150, 1, "px"),
+  slider("tint", "Заливка", withColor ? 28 : 12, 0, 100, 1, "%"),
+  ...(withColor ? [{ type: "color", key: "color", label: "Цвет", value: "#7aa7ff" } as const] : []),
+  slider("stroke", "Обводка", 1.5, 0, 10, 0.5, "px"), slider("shadow", "Тень", 30, 0, 100, 1, "%"),
+];
+
+function glassPreset(id: string, title: string, subtitle: string, w: number, h: number, r: number, withColor: boolean): Preset {
+  return {
+    id, title, subtitle, group: "Стекло", controls: glassControls(w, h, r, withColor) as Preset["controls"],
+    preview: (v) => glassStage(v, title),
+    hint: () => "В центре кадра, поверх всего. Двигайте плашку — стекло поедет вместе с ней",
+    applyLabel: "Создать",
+    build: (v) => act(glass, { title, width: v.width, height: v.height, radius: v.radius, frost: v.frost, tint: v.tint, color: v.color, stroke: v.stroke, shadow: v.shadow }),
+  };
+}
+
 export const CREATE_PRESETS: Preset[] = [
+  glassPreset("glass", "Стеклянная плашка", "Матовое стекло со скруглением", 800, 400, 80, false),
+  glassPreset("glassColor", "Цветное стекло", "Стекло с цветной подсветкой", 800, 400, 80, true),
+  glassPreset("glassPill", "Стеклянная кнопка", "Таблетка с матовым стеклом", 360, 110, 55, false),
   ...LAYER_ITEMS.map((it): Preset => ({
     id: it.kind, title: it.title, subtitle: it.hint, group: "Слои",
     controls: it.kind === "solid" ? [{ type: "color", key: "color", label: "Цвет", value: "#9f18ec" }] : [],

@@ -142,6 +142,18 @@ export const EXPR_PRESETS: ExprPreset[] = [
     code: (n) => `${VEC}\nM(value, 1 + ${fx(n("amp"))} / 100 * Math.sin(time * ${fx(n("freq"))} * 2 * Math.PI))`,
   },
   {
+    id: "throw", title: "Бросок", hint: "Слой летит от начала слоя и плавно тормозит",
+    params: [{ key: "vx", label: "Скорость X", value: 800, min: -5000, max: 5000, step: 10 }, { key: "vy", label: "Скорость Y", value: -300, min: -5000, max: 5000, step: 10 }, { key: "drag", label: "Торможение", value: 3, min: 0.1, max: 20, step: 0.1 }],
+    defaultPath: POS, forceDefault: true, controlName: ctl("Бросок"),
+    code: (n) => `var t = Math.max(0, time - inPoint), k = Math.max(${fx(n("drag"))}, 0.001);\nvar s = (1 - Math.exp(-k * t)) / k;\nadd(value, value.length == 3 ? [${fx(n("vx"))} * s, ${fx(n("vy"))} * s, 0] : [${fx(n("vx"))} * s, ${fx(n("vy"))} * s])`,
+  },
+  {
+    id: "breathe", title: "Дыхание", hint: "Мягкое медленное увеличение и возврат",
+    params: [{ key: "amp", label: "Сила", value: 4, min: 0, max: 50, step: 0.5 }, { key: "period", label: "Период", value: 3, min: 0.2, max: 20, step: 0.1 }],
+    defaultPath: SCALE, forceDefault: true, controlName: ctl("Дыхание"),
+    code: (n) => `mul(value, 1 + ${fx(n("amp"))} / 100 * (0.5 - 0.5 * Math.cos(time * 2 * Math.PI / Math.max(${fx(n("period"))}, 0.01))))`,
+  },
+  {
     id: "sine", title: "Волна", hint: "Плавное колебание по синусоиде (по вертикали)",
     params: [{ key: "amp", label: "Размах", value: 40, min: 0, max: 500, step: 1 }, { key: "freq", label: "Частота", value: 0.5, min: 0.05, max: 10, step: 0.05 }],
     defaultPath: POS, controlName: ctl("Волна"),

@@ -8,6 +8,7 @@ import { compInfo, labelByType, precompose, removeUnused, sequence } from "./ae/
 import { motion } from "./ae/motion";
 import { applyPreset } from "./preset-tool";
 import { sceneTransition } from "./ae/scene";
+import { glass } from "./ae/glass";
 import { libraryTools } from "./ae/library";
 import { getLibraryItems } from "../lib/library";
 
@@ -19,7 +20,7 @@ export const tools: Tool<any>[] = [
   ...libraryTools(getLibraryItems),
   ease, readEase,
   expression, customExpression, clearExpression,
-  createLayer, addEffect, element,
+  createLayer, addEffect, element, glass,
   textCopyStyle, textPasteStyle,
   precompose, sequence, labelByType, removeUnused,
 ];

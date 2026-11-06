@@ -69,7 +69,7 @@ const effectFactory = (m) => () => new Group(m,
   m === "ADBE Drop Shadow" ? [new Prop("Color", [0, 0, 0, 1], PVT.COLOR), new Prop("Opacity", 127), new Prop("Direction", 135), new Prop("Distance", 5), new Prop("Softness", 0)]
   : m === "ADBE Geometry2" ? [new Prop("Anchor", [960, 540], PVT.TwoD_SPATIAL), new Prop("Position", [960, 540], PVT.TwoD_SPATIAL), ...many(10)]
   : m === "ADBE Tile" ? many(8) : m === "ADBE Gaussian Blur 2" ? many(3) : [new Prop(m + " value", 0)]);
-const EFFECTS = ["CC Light Sweep", "ADBE Noise", "ADBE Black&White", "ADBE CurvesCustom", "ADBE HUE SATURATION", "ADBE Geometry2", "ADBE Tile", "ADBE Gaussian Blur 2", "ADBE Slider Control", "ADBE Checkbox Control", "ADBE Layer Control", "ADBE Angle Control", "ADBE Glo2", "ADBE Gaussian Blur 2", "ADBE Tint", "ADBE Fill", "ADBE Drop Shadow"];
+const EFFECTS = ["ADBE Brightness & Contrast 2", "CC Light Sweep", "ADBE Noise", "ADBE Black&White", "ADBE CurvesCustom", "ADBE HUE SATURATION", "ADBE Geometry2", "ADBE Tile", "ADBE Gaussian Blur 2", "ADBE Slider Control", "ADBE Checkbox Control", "ADBE Layer Control", "ADBE Angle Control", "ADBE Glo2", "ADBE Gaussian Blur 2", "ADBE Tint", "ADBE Fill", "ADBE Drop Shadow"];
 
 function transform(pos) {
   const p = new Prop("Position", [...pos], PVT.TwoD_SPATIAL, "ADBE Position");
@@ -91,6 +91,7 @@ export class Layer {
   sourceRectAtTime() { return this.rect; }
   setParentWithJump(p) { this.parent = p; }
   moveBefore(other) { this.movedBefore = other; }
+  moveAfter(other) { if (this.comp) { const L = this.comp.list; L.splice(L.indexOf(this), 1); L.splice(L.indexOf(other) + 1, 0, this); } }
   moveToBeginning() { this.atTop = true; }
   remove() { this.removed = true; }
   get index() { return this.comp ? this.comp.list.indexOf(this) + 1 : 1; }
@@ -141,8 +142,9 @@ export function makeContext(activeItem) {
       "ADBE Vector Group": () => new Group("ADBE Vector Group", [vectorsGroup("ADBE Vectors Group")]),
       "ADBE Vector Shape - Group": () => new Group("", [new Prop("Path", null, PVT.SHAPE, "ADBE Vector Shape")]),
       "ADBE Vector Shape - Ellipse": () => new Group("", [new Prop("Size", [100, 100], PVT.TwoD, "ADBE Vector Ellipse Size")]),
-      "ADBE Vector Shape - Rect": () => new Group("", [new Prop("Size", [100, 100], PVT.TwoD, "ADBE Vector Rect Size")]),
-      "ADBE Vector Graphic - Stroke": () => new Group("", [new Prop("Color", [1, 1, 1, 1], PVT.COLOR, "ADBE Vector Stroke Color"), new Prop("Stroke Width", 2, PVT.OneD, "ADBE Vector Stroke Width"), new Prop("Line Cap", 1, PVT.NO_VALUE, "ADBE Vector Stroke Line Cap")]),
+      "ADBE Vector Shape - Rect": () => new Group("", [new Prop("Size", [100, 100], PVT.TwoD, "ADBE Vector Rect Size"), new Prop("Roundness", 0, PVT.OneD, "ADBE Vector Rect Roundness")]),
+      "ADBE Vector Graphic - Fill": () => new Group("", [new Prop("Color", [1, 1, 1, 1], PVT.COLOR, "ADBE Vector Fill Color"), new Prop("Opacity", 100, PVT.OneD, "ADBE Vector Fill Opacity")]),
+      "ADBE Vector Graphic - Stroke": () => new Group("", [new Prop("Color", [1, 1, 1, 1], PVT.COLOR, "ADBE Vector Stroke Color"), new Prop("Stroke Width", 2, PVT.OneD, "ADBE Vector Stroke Width"), new Prop("Line Cap", 1, PVT.NO_VALUE, "ADBE Vector Stroke Line Cap"), new Prop("Opacity", 100, PVT.OneD, "ADBE Vector Stroke Opacity")]),
       "ADBE Vector Filter - Trim": () => new Group("", [new Prop("Start", 0, PVT.OneD, "ADBE Vector Trim Start"), new Prop("End", 100, PVT.OneD, "ADBE Vector Trim End")]),
     } });
   }

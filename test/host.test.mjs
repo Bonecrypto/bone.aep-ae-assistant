@@ -374,3 +374,16 @@ test("маркер: текст и тряска ставят маркер с дл
   const r = h.run("ae.expressions", { chain: true, marker: { name: "Удар @@", duration: 0.8 }, items: [{ path: ["ADBE Transform Group", "ADBE Position"], code: "return value;" }], controls: [] });
   assert.equal(r.ok, true);
 });
+
+test("стекло: плашка + корректирующий слой под ней с маской, привязан к плашке", () => {
+  const h = makeContext([]);
+  const r = h.run("ae.glass", { width: 600, height: 300, radius: 60, frost: 30, tint: 12, stroke: 1.5, shadow: 30, name: "Стекло", blurName: "Стекло · размытие" });
+  assert.equal(r.ok, true); assert.equal(r.failedParams, 0);
+  const plate = h.comp.layer(1), adj = h.comp.layer(2);
+  assert.equal(plate.name, "Стекло"); assert.equal(adj.adjustmentLayer, true); assert.equal(adj.parent, plate);
+  assert.equal(adj.name, "Стекло · размытие");
+  const verts = adj.property("ADBE Mask Parade").property(1).property("ADBE Mask Shape").value.vertices;
+  assert.equal(verts.length, 8); assert.deepEqual(plain(verts[0]), [960 - 300 + 60, 540 - 150]);
+  const c = plate.property("ADBE Root Vectors Group").property(1).property("ADBE Vectors Group");
+  assert.deepEqual(c.children.map((x) => x.matchName), ["ADBE Vector Shape - Rect", "ADBE Vector Graphic - Fill", "ADBE Vector Graphic - Stroke"]);
+});
