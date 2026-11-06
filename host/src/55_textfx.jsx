@@ -68,7 +68,9 @@
 
         var sel = anim.property("ADBE Text Selectors").addProperty("ADBE Text Expressible Selector");
         if (!setBasedOn(sel, args.unit)) unitSet = args.unit === "chars";
-        if (args.marker) addLayerMarker(layer, comp.time, args.marker.duration, args.marker.name.split("@@").join(tag));
+        var mt = comp.time;
+        if (args.at === "layer") mt = args.mode === "out" ? layer.outPoint - args.marker.duration : layer.inPoint;
+        if (args.marker) addLayerMarker(layer, mt, args.marker.duration, args.marker.name.split("@@").join(tag));
         var amount = findByMatch(sel, /Amount/);
         if (amount) {
           amount.expression = args.code.split("@@").join(tag);

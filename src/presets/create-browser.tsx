@@ -2,6 +2,7 @@ import { addEffect, createLayer, element } from "../tools/ae/create";
 import { precompose, sequence, labelByType, removeUnused } from "../tools/ae/service";
 import { motionBlur } from "../tools/ae/animate";
 import { glass } from "../tools/ae/glass";
+import { align, anchor, distribute, reverseKeys, splitText } from "../tools/ae/layout";
 import { ELEMENT_ITEMS, EFFECT_ITEMS, LAYER_ITEMS } from "./create";
 import { layersWord } from "../lib/format";
 import { act, slider, type Preset } from "./types";
@@ -83,6 +84,35 @@ export const CREATE_PRESETS: Preset[] = [
 ];
 
 export const SERVICE_PRESETS: Preset[] = [
+  {
+    id: "anchor", title: "Точка привязки", subtitle: "В угол или центр, без сдвига слоя", group: "Раскладка",
+    controls: [{ type: "grid9", key: "pos", label: "Куда", value: "0.5,0.5" }],
+    hint: (_v, sel) => sel.selected ? `${layersWord(sel.selected)} · по границам содержимого` : "Выделите слои",
+    build: (v) => { const [x, y] = String(v.pos).split(",").map(Number); return act(anchor, { x, y }); },
+  },
+  {
+    id: "align", title: "Выровнять", subtitle: "По кадру или по выделению", group: "Раскладка",
+    controls: [
+      { type: "seg", key: "mode", label: "Как", value: "center", options: [{ value: "left", label: "⇤" }, { value: "hcenter", label: "↔" }, { value: "right", label: "⇥" }, { value: "top", label: "⤒" }, { value: "vcenter", label: "↕" }, { value: "bottom", label: "⤓" }, { value: "center", label: "◎" }] },
+      { type: "seg", key: "to", label: "По", value: "comp", options: [{ value: "comp", label: "Кадру" }, { value: "selection", label: "Выделению" }] },
+    ],
+    hint: () => "Ключи позиции сдвигаются вместе со слоем",
+    build: (v) => act(align, { mode: v.mode, to: v.to }),
+  },
+  {
+    id: "distribute", title: "Распределить", subtitle: "Равные промежутки между слоями", group: "Раскладка",
+    controls: [{ type: "seg", key: "axis", label: "Ось", value: "x", options: [{ value: "x", label: "По горизонтали" }, { value: "y", label: "По вертикали" }] }],
+    hint: () => "Выделите минимум три слоя — крайние останутся на месте",
+    build: (v) => act(distribute, { axis: v.axis }),
+  },
+  { id: "reverse", title: "Развернуть ключи", subtitle: "Анимация задом наперёд", group: "Ключи", controls: [],
+    hint: () => "Выделенные ключи (минимум 2), иначе все ключи выделенных свойств", build: () => act(reverseKeys, {}) },
+  {
+    id: "split", title: "Разбить текст", subtitle: "На буквы, слова или строки слоями", group: "Текст",
+    controls: [{ type: "seg", key: "unit", label: "На", value: "words", options: [{ value: "chars", label: "Буквы" }, { value: "words", label: "Слова" }, { value: "lines", label: "Строки" }] }],
+    hint: (_v, sel) => sel.text ? "Каждая часть останется на своём месте, исходный слой выключится" : "Выделите текстовый слой",
+    build: (v) => act(splitText, { unit: v.unit }),
+  },
   { id: "precomp", title: "Прекомпоз", subtitle: "Собрать выделенные слои в композицию", group: "Слои", controls: [], build: () => act(precompose, { name: "Прекомпоз" }) },
   {
     id: "seq", title: "По очереди", subtitle: "Сдвинуть слои лесенкой", group: "Время",

@@ -7,7 +7,8 @@ export type Ctl =
   | { type: "slider"; key: string; label: string; min: number; max: number; step: number; unit?: string; value: number }
   | { type: "seg"; key: string; label: string; options: { value: string; label: string }[]; value: string }
   | { type: "toggle"; key: string; label: string; value: boolean }
-  | { type: "color"; key: string; label: string; value: string };
+  | { type: "color"; key: string; label: string; value: string }
+  | { type: "grid9"; key: string; label: string; value: string };
 
 export type Values = Record<string, any>;
 
@@ -47,6 +48,9 @@ export type Action = { tool: Tool<any>; input: any };
 export const act = <I,>(tool: Tool<I>, input: I): Action => ({ tool, input });
 
 export const defaults = (p: Preset): Values => Object.fromEntries(p.controls.map((c) => [c.key, c.value]));
+
+/** Где ставить анимацию: от указателя времени или от краёв слоя (появление — от начала, исчезание — к концу). */
+export const AT_SEG: Ctl = { type: "seg", key: "at", label: "Где", value: "playhead", options: [{ value: "playhead", label: "От указателя" }, { value: "layer", label: "По краям слоя" }] };
 
 export const DIR_SEG: Ctl = { type: "seg", key: "mode", label: "Направление", value: "in", options: [{ value: "in", label: "Появление" }, { value: "out", label: "Исчезание" }] };
 export const slider = (key: string, label: string, value: number, min: number, max: number, step: number, unit?: string): Ctl =>

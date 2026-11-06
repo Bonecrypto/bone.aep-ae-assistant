@@ -35,6 +35,11 @@ export class Prop {
   nearestKeyIndex(t) { let best = 0; this.keys.forEach((k, i) => { if (Math.abs(k.t - t) < Math.abs(this.keys[best].t - t)) best = i; }); return best + 1; }
   key(i) { if (i < 1 || i > this.keys.length) throw new Error("bad key index " + i); return this.keys[i - 1]; }
   keyTime(i) { return this.key(i).t; }
+  setValueAtKey(i, v) { this.key(i).v = v; }
+  removeKey(i) { this.key(i); this.keys.splice(i - 1, 1); }
+  keyInSpatialTangent(i) { return this.key(i).inS ?? [0, 0]; }
+  keyOutSpatialTangent(i) { return this.key(i).outS ?? [0, 0]; }
+  setSpatialTangentsAtKey(i, a, b = a) { Object.assign(this.key(i), { inS: a, outS: b }); }
   keyValue(i) { return this.key(i).v; }
   keyInInterpolationType(i) { return this.key(i).inI; }
   keyOutInterpolationType(i) { return this.key(i).outI; }
@@ -83,7 +88,7 @@ function transform(pos) {
 
 export class Layer {
   constructor({ name = "Слой", pos = [960, 540], locked = false, rect = { left: -100, top: -50, width: 200, height: 100 } } = {}) {
-    Object.assign(this, { name, locked, rect, parent: null, threeDLayer: false, selected: true, label: 0, startTime: 0, inPoint: 0, outPoint: 10, nullLayer: false, adjustmentLayer: false, hasVideo: true, hasAudio: false, source: null });
+    Object.assign(this, { enabled: true, name, locked, rect, parent: null, threeDLayer: false, selected: true, label: 0, startTime: 0, inPoint: 0, outPoint: 10, nullLayer: false, adjustmentLayer: false, hasVideo: true, hasAudio: false, source: null });
     this.groups = { "ADBE Marker": Object.assign(new Prop("Marker", null, PVT.NO_VALUE, "ADBE Marker"), { canSetExpression: false }), "ADBE Transform Group": transform(pos), "ADBE Effect Parade": new Group("ADBE Effect Parade", [], { addable: Object.fromEntries(EFFECTS.map((m) => [m, effectFactory(m)])) }) };
     this.selectedProperties = [];
   }
@@ -150,6 +155,7 @@ export function makeContext(activeItem) {
   }
   function makeText(name, doc) {
     const l = new TextLayer({ name });
+    l.duplicate = () => { const d = makeText(name, { ...doc }); d.selected = false; return comp.attach(d, true); };
     const docProp = new Prop("Source Text", doc, PVT.TEXT_DOCUMENT, "ADBE Text Document");
     const animators = new Group("ADBE Text Animators", [], { addable: { "ADBE Text Animator": () => new Group("", [
       new Group("ADBE Text Selectors", [], { addable: {

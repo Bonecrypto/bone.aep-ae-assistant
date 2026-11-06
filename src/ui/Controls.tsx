@@ -42,6 +42,17 @@ export function Controls({ controls, values, onChange }: { controls: Ctl[]; valu
             <span className="toggle"><input type="checkbox" checked={!!values[c.key]} onChange={(e) => set(c.key, e.target.checked)} /><span className="switch" /></span>
           </label>
         );
+        if (c.type === "grid9") return (
+          <div key={c.key} className="ctl-row">
+            <span>{c.label}</span>
+            <div className="grid9">
+              {[0, 0.5, 1].flatMap((y) => [0, 0.5, 1].map((x) => {
+                const val = `${x},${y}`;
+                return <button key={val} className={values[c.key] === val ? "on" : ""} onClick={() => set(c.key, val)} title={`${x === 0 ? "слева" : x === 1 ? "справа" : "по центру"}, ${y === 0 ? "сверху" : y === 1 ? "снизу" : "посередине"}`} />;
+              }))}
+            </div>
+          </div>
+        );
         return (
           <div key={c.key} className="ctl-row"><span>{c.label}</span><Color value={values[c.key]} onChange={(v) => set(c.key, v)} hint={c.label} /></div>
         );

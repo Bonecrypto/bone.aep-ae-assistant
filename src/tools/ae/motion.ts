@@ -15,6 +15,7 @@ export type MotionInput = {
   control?: "keys" | "marker";
   markerName?: string;
   hidden?: string;
+  at?: "playhead" | "layer";
 };
 
 export const motion = hostTool<MotionInput>({
@@ -42,5 +43,5 @@ export const motion = hostTool<MotionInput>({
   },
   mutates: true,
   toArgs: (i) => ({ ...i, title: undefined, blurName: "Ассистент · размытие" }),
-  done: (r, i) => `${i.title ?? "Переход"}: ${layersWord(Number(r.changed))}.${undoHint}`,
+  done: (r, i) => `${i.title ?? "Переход"}: ${layersWord(Number(r.changed))}.${undoHint}${Number(r.foreign) ? ` · не тронуто свойств с вашими выражениями: ${r.foreign}` : ""}`,
 });

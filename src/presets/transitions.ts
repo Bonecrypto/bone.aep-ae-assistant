@@ -5,7 +5,7 @@ import { motion, type MotionInput } from "../tools/ae/motion";
 import { sceneTransition, type SceneKind } from "../tools/ae/scene";
 import { libImport } from "../tools/ae/library";
 import type { LibItem } from "../lib/library";
-import { act, DIR_SEG, slider, type Ctl, type Pose, type Preset, type Values } from "./types";
+import { act, AT_SEG, DIR_SEG, slider, type Ctl, type Pose, type Preset, type Values } from "./types";
 
 // Переходы слоёв. Каждый пресет — набор свойств для ae.motion + те же формулы для превью.
 type Recipe = (v: Values) => Omit<MotionInput, "mode" | "duration" | "stagger" | "title">;
@@ -46,7 +46,7 @@ export function markerArgs(title: string, mode: string, spring: boolean) {
 }
 
 function make(id: string, title: string, subtitle: string, group: string, extra: Ctl[], recipe: Recipe, multi = false): Preset {
-  const controls = [DIR_SEG, DUR, ...extra, ...(multi ? [STAG] : [])];
+  const controls = [DIR_SEG, AT_SEG, DUR, ...extra, ...(multi ? [STAG] : [])];
   return {
     id, title, subtitle, group, controls,
     preview: (v) => {
@@ -57,7 +57,7 @@ function make(id: string, title: string, subtitle: string, group: string, extra:
     hint: (_v, sel) => sel.selected
       ? `${layersWord(sel.selected)} · ${getPrefs().animControl === "marker" ? "длительность — маркер на слое, тяните его конец" : "ключами от текущего времени"}`
       : "Выделите слои и поставьте указатель времени",
-    build: (v) => act(motion, { ...recipe(v), title, mode: v.mode, duration: v.duration, stagger: multi ? v.stagger : 0, ...markerArgs(title, v.mode, !!recipe(v).spring) }),
+    build: (v) => act(motion, { ...recipe(v), title, mode: v.mode, duration: v.duration, stagger: multi ? v.stagger : 0, at: v.at, ...markerArgs(title, v.mode, !!recipe(v).spring) }),
   };
 }
 

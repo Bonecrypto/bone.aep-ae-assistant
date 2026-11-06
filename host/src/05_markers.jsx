@@ -32,6 +32,13 @@
     return n;
   }
 
+  // Можно ли добавить звено: свойство без выражения или с нашей цепочкой. Чужое выражение не трогаем.
+  function canChain(prop) {
+    if (!prop || !prop.canSetExpression) return false;
+    if (!prop.expressionEnabled || prop.expression === "") return true;
+    return prop.expression.indexOf(CHAIN_HEAD) === 0; // строка
+  }
+
   // Добавить звено в цепочку выражений свойства. body — тело функции от value, с return.
   function chainExpression(prop, body) {
     var old = prop.expressionEnabled ? prop.expression : "";

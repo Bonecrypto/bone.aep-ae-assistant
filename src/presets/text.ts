@@ -4,7 +4,7 @@ import { plural } from "../lib/format";
 import { setPrefs, getPrefs, setStatus } from "../lib/store";
 import { textFx, type TextFxArgs } from "../tools/ae/textfx";
 import { textCopyStyle, textPasteStyle } from "../tools/ae/text";
-import { act, DIR_SEG, slider, type Ctl, type Pose, type Preset, type Values } from "./types";
+import { act, AT_SEG, DIR_SEG, slider, type Ctl, type Pose, type Preset, type Values } from "./types";
 
 /*
  * Текст: аниматор задаёт «спрятанное» состояние, Expression Selector для каждой единицы считает,
@@ -64,7 +64,7 @@ function previewIndex(order: string, i: number, n: number) {
 const markerFor = (title: string, mode: string, tag: string) => `${mode === "out" ? "Исчезание" : "Появление"} · ${title} ${tag}`;
 
 function make(id: string, title: string, subtitle: string, extra: Ctl[], hidden: (v: Values) => Hidden, init: Partial<Record<string, any>> = {}): Preset {
-  const controls = [DIR_SEG, UNIT, EASE, TOTAL, SOFT, ...extra, ORDER].map((c) => (c.key in init ? { ...c, value: init[c.key] } : c)) as Ctl[];
+  const controls = [DIR_SEG, AT_SEG, UNIT, EASE, TOTAL, SOFT, ...extra, ORDER].map((c) => (c.key in init ? { ...c, value: init[c.key] } : c)) as Ctl[];
   return {
     id, title, subtitle, group: "Появление и исчезание", controls,
     code: (v) => amountCode(v, markerFor(title, v.mode, "@@")),
@@ -97,7 +97,7 @@ function make(id: string, title: string, subtitle: string, extra: Ctl[], hidden:
       return act(textFx, {
         title, unit: v.unit, props: hidden(v), code: amountCode(v, name), startSlider: "",
         controls: [{ name: "Текст@@ · плавность", value: v.soft }],
-        marker: { name, duration: v.total },
+        marker: { name, duration: v.total }, at: v.at, mode: v.mode,
       });
     },
   };

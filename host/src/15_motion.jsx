@@ -32,13 +32,16 @@
   }
 
   // Режим маркера: те же «спрятанные» значения, но через выражения, от маркера слоя.
+  var foreign = { n: 0 };
   function motionByMarker(layer, tr, comp, t0, duration, args, isIn) {
     var tag = nextTag(layer), name = String(args.markerName || "Anim @@").split("@@").join(tag);
     var head = "var mk = MK(" + str(name) + ");\nif (!mk) return value;\n" +
       "var p = Math.min(1, Math.max(0, (time - mk.time) / Math.max(mk.duration, 0.001)));\n" +
       "var h = " + args.hidden + ";\n";
     var did = false;
-    if (args.fade) { chainExpression(tr.property("ADBE Opacity"), head + "return value * Math.max(0, 1 - h);"); did = true; }
+    // свойства со своим (не нашим) выражением пропускаем, чтобы его не затереть
+    var add = function (prop, body) { if (!canChain(prop)) { foreign.n++; return; } chainExpression(prop, head + body); did = true; };
+    if (args.fade) add(tr.property("ADBE Opacity"), "return value * Math.max(0, 1 - h);");
     if (args.move) {
       var horizontal = args.move.dir === "left" || args.move.dir === "right", axis = horizontal ? 0 : 1;
       var sign = args.move.dir === "left" || args.move.dir === "up" ? -1 : 1;
@@ -47,22 +50,17 @@
       var rest = mp.valueAtTime(t0, false), cur = sep ? rest : rest[axis];
       var hidden = args.move.distance > 0 ? cur + sign * args.move.distance : offscreen(layer, tr, comp, t0, args.move.dir, cur);
       var d = hidden - cur;
-      if (sep) chainExpression(mp, head + "return value + " + num(d) + " * h;");
+      if (sep) add(mp, "return value + " + num(d) + " * h;");
       else {
         var off = []; for (var k = 0; k < rest.length; k++) off.push(k === axis ? d : 0);
-        chainExpression(mp, head + "return add(value, mul(" + vec(off) + ", h));");
+        add(mp, "return add(value, mul(" + vec(off) + ", h));");
       }
-      did = true;
     }
-    if (args.scaleFrom !== null && args.scaleFrom !== undefined) {
-      chainExpression(tr.property("ADBE Scale"), head + "return mul(value, 1 + (" + num(args.scaleFrom / 100) + " - 1) * h);"); did = true;
-    }
-    if (args.rotateFrom) {
-      chainExpression(tr.property("ADBE Rotate Z"), head + "return value + " + num(isIn ? args.rotateFrom : -args.rotateFrom) + " * h;"); did = true;
-    }
+    if (args.scaleFrom !== null && args.scaleFrom !== undefined) add(tr.property("ADBE Scale"), "return mul(value, 1 + (" + num(args.scaleFrom / 100) + " - 1) * h);");
+    if (args.rotateFrom) add(tr.property("ADBE Rotate Z"), "return value + " + num(isIn ? args.rotateFrom : -args.rotateFrom) + " * h;");
     if (args.blurFrom > 0) {
       var bp = blurProp(layer, args.blurName || "Blur");
-      if (bp) { chainExpression(bp, head + "return value + " + num(args.blurFrom) + " * Math.max(0, h);"); did = true; }
+      if (bp) add(bp, "return value + " + num(args.blurFrom) + " * Math.max(0, h);");
     }
     if (did) addLayerMarker(layer, t0, duration, name);
     return did;
@@ -77,6 +75,7 @@
     var duration = args.duration > 0 ? args.duration : 0.6;
     var stagger = args.stagger > 0 ? args.stagger : 0;
     var changed = 0, skipped = { locked: 0, noPosition: 0, expression: 0 };
+    foreign.n = 0;
 
     undoable(args.undoName, function () {
       for (var i = 0; i < layers.length; i++) {
@@ -85,7 +84,9 @@
         if (layer instanceof CameraLayer || layer instanceof LightLayer) { skipped.noPosition++; continue; }
         var tr = layer.property("ADBE Transform Group");
         if (!tr) { skipped.noPosition++; continue; }
-        var t0 = comp.time + i * stagger, t1 = t0 + duration, did = false;
+        var t0 = comp.time + i * stagger;
+        if (args.at === "layer") t0 = isIn ? layer.inPoint + i * stagger : layer.outPoint - duration - i * stagger;
+        var t1 = t0 + duration, did = false;
         if (args.control === "marker") {
           var r = motionByMarker(layer, tr, comp, t0, duration, args, isIn);
           if (r) changed++; else skipped.expression++;
@@ -137,6 +138,6 @@
         if (did) changed++; else skipped.expression++;
       }
     });
-    if (!changed) return fail("NOTHING_CHANGED", { skipped: skipped });
-    return { ok: true, changed: changed, skipped: skipped };
+    if (!changed) return fail(foreign.n ? "FOREIGN_EXPRESSION" : "NOTHING_CHANGED", { skipped: skipped });
+    return { ok: true, changed: changed, skipped: skipped, foreign: foreign.n };
   };

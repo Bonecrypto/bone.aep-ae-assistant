@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { makeContext, plain, PVT } from "./ae-mock.mjs";
+import { makeContext, plain, PVT, KeyframeEase } from "./ae-mock.mjs";
+const h1 = { KE: KeyframeEase };
 
 // Мини-движок выражений AE для проверки сгенерированного кода.
 const op = (f) => (a, b) => (Array.isArray(a) ? a.map((x, i) => f(x, Array.isArray(b) ? b[i] : b)) : f(a, b));
@@ -386,4 +387,72 @@ test("стекло: плашка + корректирующий слой под 
   assert.equal(verts.length, 8); assert.deepEqual(plain(verts[0]), [960 - 300 + 60, 540 - 150]);
   const c = plate.property("ADBE Root Vectors Group").property(1).property("ADBE Vectors Group");
   assert.deepEqual(c.children.map((x) => x.matchName), ["ADBE Vector Shape - Rect", "ADBE Vector Graphic - Fill", "ADBE Vector Graphic - Stroke"]);
+});
+
+
+// ---------- 0.9: края слоя, чужие выражения, раскладка, ключи, разбивка текста ----------
+test("маркер по краям слоя: появление от начала слоя, исчезание к концу", () => {
+  const { run, l } = one();
+  l.inPoint = 2; l.outPoint = 8;
+  run("ae.motion", { mode: "in", duration: 0.5, fade: true, control: "marker", markerName: "П @@", hidden: "(1 - p)", at: "layer" });
+  run("ae.motion", { mode: "out", duration: 1, fade: true, control: "marker", markerName: "И @@", hidden: "p", at: "layer" });
+  assert.deepEqual(l.property("ADBE Marker").keys.map((k) => k.t), [2, 7]);
+});
+
+test("своё выражение пользователя не затирается — понятная ошибка", () => {
+  const { run, tr } = one();
+  tr.property("ADBE Opacity").expression = "wiggle(1, 10)"; tr.property("ADBE Opacity").expressionEnabled = true;
+  const r = run("ae.motion", { mode: "in", fade: true, control: "marker", markerName: "П @@", hidden: "(1 - p)" });
+  assert.equal(r.code, "FOREIGN_EXPRESSION");
+  assert.equal(tr.property("ADBE Opacity").expression, "wiggle(1, 10)");
+  const r2 = run("ae.motion", { mode: "in", fade: true, scaleFrom: 0, control: "marker", markerName: "П @@", hidden: "(1 - p)" });
+  assert.equal(r2.ok, true); assert.equal(r2.foreign, 1);
+});
+
+test("точка привязки по сетке: слой не сдвигается", () => {
+  const { run, tr } = one(); // прямоугольник 200x100 с центром в якоре 0,0; позиция 960,540
+  tr.property("ADBE Scale").value = [200, 200, 100];
+  run("ae.anchor", { x: 0, y: 0 });
+  assert.deepEqual(plain(tr.property("ADBE Anchor Point").value), [-100, -50]);
+  assert.deepEqual(plain(tr.property("ADBE Position").value), [960 - 200, 540 - 100], "сдвиг позиции с учётом масштаба");
+  tr.property("ADBE Anchor Point").setValueAtTime(0, [0, 0]);
+  assert.equal(run("ae.anchor", { x: 1, y: 1 }).code, "ANCHOR_KEYED");
+});
+
+test("выравнивание по кадру и распределение; ключи позиции едут вместе", () => {
+  const h = makeContext([]);
+  const a = h.comp.attach(new h.Layer({ pos: [300, 300] })), b = h.comp.attach(new h.Layer({ pos: [500, 700] })), c = h.comp.attach(new h.Layer({ pos: [1500, 400] }));
+  b.property("ADBE Transform Group").property("ADBE Position").setValueAtTime(0, [500, 700]);
+  b.property("ADBE Transform Group").property("ADBE Position").setValueAtTime(1, [600, 700]);
+  h.run("ae.align", { mode: "left", to: "comp" });
+  assert.equal(a.property("ADBE Transform Group").property("ADBE Position").value[0], 100, "левый край слоя на 0");
+  assert.deepEqual(plain(b.property("ADBE Transform Group").property("ADBE Position").keys.map((k) => k.v[0])), [0, 100], "в 1 с ключ на 600, левый край 500 -> 0");
+  const d = makeContext([]);
+  const ls = [[100, 0], [250, 0], [900, 0]].map((p) => d.comp.attach(new d.Layer({ pos: p })));
+  d.run("ae.distribute", { axis: "x" });
+  assert.equal(ls[1].property("ADBE Transform Group").property("ADBE Position").value[0], 500);
+  assert.equal(makeContext([]).run("ae.distribute", { axis: "x" }).code, "NEED_THREE_LAYERS");
+});
+
+test("развернуть ключи: значения и ease меняются местами во времени", () => {
+  const { run, tr, l } = one();
+  const p = tr.property("ADBE Opacity");
+  p.setValueAtTime(1, 0); p.setValueAtTime(3, 100);
+  p.setTemporalEaseAtKey(1, [new h1.KE(0, 10)], [new h1.KE(0, 90)]);
+  l.selectedProperties = [p];
+  run("ae.reverseKeys", {});
+  assert.deepEqual(p.keys.map((k) => [k.t, k.v]), [[1, 100], [3, 0]]);
+  assert.equal(p.keys[1].inE[0].influence, 90); assert.equal(p.keys[1].outE[0].influence, 10);
+});
+
+test("разбить текст по словам: слой на слово, остальные части спрятаны, исходный выключен", () => {
+  const h = makeContext([]);
+  const t = h.comp.attach(h.makeText("Фраза", { text: "раз два  три" }));
+  const r = h.run("ae.splitText", { unit: "words" });
+  assert.equal(r.changed, 3);
+  assert.deepEqual(h.comp.list.slice(0, 3).map((l) => l.name), ["раз", "два", "три"]);
+  const sel = h.comp.layer(2).property("ADBE Text Properties").property("ADBE Text Animators").property(1).property("ADBE Text Selectors").property(1);
+  assert.equal(sel.property("ADBE Text Range Type2").value, 3);
+  assert.match(sel.property("ADBE Text Expressible Amount").expression, /textIndex == 2/);
+  assert.equal(t.enabled, false);
 });

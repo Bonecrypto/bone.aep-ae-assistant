@@ -124,7 +124,7 @@
     if (!comp) return fail("NO_COMP");
     var layers = selectedLayers(comp);
     if (!layers.length) return fail("NO_SELECTION");
-    var changed = 0, errors = [], separated = 0;
+    var changed = 0, errors = [], separated = 0, foreignN = 0;
     undoable(args.undoName, function () {
       for (var i = 0; i < layers.length; i++) {
         var layer = layers[i];
@@ -143,6 +143,7 @@
           if (p.dimensionsSeparated) { separated++; continue; }
           var code = args.items[k].code.split("@@").join(tag);
           if (args.chain) {
+            if (!canChain(p)) { foreignN++; continue; }
             var err = chainExpression(p, code);
             if (err) errors.push(err);
           } else {
@@ -157,6 +158,7 @@
       }
     });
     if (!changed && separated) return fail("SEPARATED_DIMENSIONS");
+    if (!changed && foreignN) return fail("FOREIGN_EXPRESSION");
     if (!changed) return fail("NOTHING_CHANGED", { skipped: { other: layers.length } });
-    return { ok: true, changed: changed, separated: separated, expressionError: errors.length ? errors[0] : "" };
+    return { ok: true, changed: changed, separated: separated, foreign: foreignN, expressionError: errors.length ? errors[0] : "" };
   };
