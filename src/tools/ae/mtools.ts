@@ -41,3 +41,40 @@ export const toShapes = hostTool<Record<string, never>>({
   mutates: true,
   done: (r) => `Создано шейп-слоёв: ${Number(r.changed)}.${undoHint}`,
 });
+
+export const carousel = hostTool<{ title?: string; mode: "slide" | "cover"; hold: number; move: number; spacing: number }>({
+  name: "ae.carousel",
+  title: (i) => i.title ?? "Карусель",
+  description: "Карусель: выделенные слои (минимум 2, по порядку в таймлайне) по очереди выезжают в центр и стоят hold секунд; move — время переезда, spacing — расстояние между слоями, px. mode=cover — центральный крупнее, соседи меньше и прозрачнее.",
+  inputSchema: { type: "object", properties: {
+    mode: { type: "string", enum: ["slide", "cover"], description: "Вид." }, hold: { type: "number", description: "Пауза в центре, с." },
+    move: { type: "number", description: "Переезд, с." }, spacing: { type: "number", description: "Шаг между слоями, px." } }, required: ["mode"] },
+  mutates: true,
+  toArgs: (i) => ({ ...i, title: undefined }),
+  done: (r, i) => {
+    const len = Number(r.length);
+    return `${i.title ?? "Карусель"}: ${layersWord(Number(r.changed))}${Number.isFinite(len) ? `, ${String(Math.round(len * 10) / 10).replace(".", ",")} с` : ""}.${undoHint}`;
+  },
+});
+
+export const mergeShapes = hostTool<Record<string, never>>({
+  name: "ae.mergeShapes",
+  title: () => "Слить шейпы",
+  description: "Сливает выделенные шейп-слои в верхний: содержимое каждого становится группой с его трансформацией; исходные слои выключаются.",
+  inputSchema: { type: "object", properties: {} },
+  mutates: true,
+  done: (r) => `В «${String(r.target)}» слито ${layersWord(Number(r.changed))}; исходные выключены.${Number(r.failedParams) ? ` Не всё перенеслось (${r.failedParams}).` : ""}${undoHint}`,
+});
+
+export const textCounter = hostTool<{ title: string; code: string; controls: { name: string; value: number }[]; marker: { name: string; duration: number }; fontSize?: number }>({
+  name: "ae.textCounter",
+  title: (i) => i.title ?? "Счётчик",
+  description: "Внутренний инструмент счётчиков.",
+  inputSchema: { type: "object", properties: {} },
+  mutates: true,
+  toArgs: (i) => ({ name: i.title, code: i.code, controls: i.controls, marker: i.marker, fontSize: i.fontSize }),
+  done: (r, i) => {
+    const err = String(r.expressionError ?? "");
+    return err ? `${i.title}: ошибка выражения в AE: ${err}` : `${i.title}: текстовый слой в центре, длительность — маркер на слое.${undoHint}`;
+  },
+});

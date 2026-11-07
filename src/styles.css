@@ -334,3 +334,11 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 15p
 .grid9 button { width: 18px; height: 18px; border-radius: 5px; background: var(--surface-2); }
 .grid9 button:hover { background: var(--accent-soft); }
 .grid9 button.on { background: var(--accent); }
+.stage-counter { font-size: 40px; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.variants { display: flex; flex-wrap: wrap; gap: 5px; flex: none; }
+.chip { padding: 3px 10px; border-radius: 999px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); font-size: 11.5px; color: var(--text); }
+.chip:hover { box-shadow: inset 0 0 0 1px var(--accent); }
+.chip.ghost { color: var(--muted); background: none; }
+.chip.on { background: var(--accent); color: var(--on-accent); }
+.variant-new { display: inline-flex; gap: 4px; }
+.variant-new input { width: 120px; padding: 3px 8px; border-radius: 999px; border: 0; background: var(--bg); box-shadow: inset 0 0 0 1px var(--accent); font-size: 11.5px; user-select: text; }

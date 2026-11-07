@@ -1,11 +1,11 @@
 import { useRef, useState } from "react";
 import { runTool } from "../lib/actions";
 import { useBusy } from "../lib/busy";
-import { addFolder, createStructure, fileUrl, isNew, KIND_LABEL, libraryAvailable, markSeen, removeFolder, rescan, useLibrary, type LibItem } from "../lib/library";
+import { addFolder, createStructure, previewDirFor, waitForFiles, fileUrl, isNew, KIND_LABEL, libraryAvailable, markSeen, removeFolder, rescan, useLibrary, type LibItem } from "../lib/library";
 import { useSelection } from "../lib/selection";
 import { setPrefs, setStatus, usePrefs } from "../lib/store";
 import { plural } from "../lib/format";
-import { libImport, pickFolder, reveal } from "../tools/ae/library";
+import { libImport, makePreview, pickFolder, removeItems, reveal, savePresetDialog } from "../tools/ae/library";
 import { useWide } from "../ui/Browser";
 import { recordUse } from "../lib/usage";
 import { MediaPreview } from "../ui/Preview";
@@ -47,6 +47,22 @@ export function LibrarySection() {
     const path = r?.data?.ok ? (r.data.path as string | null) : null;
     if (path) { addFolder(path); setStatus({ kind: "ok", text: `Библиотека: ${path}` }); }
   };
+  // Превью для .ffx: AE снимает кадры пресета на образце, панель ждёт файлы и убирает временную композицию.
+  const [progress, setProgress] = useState("");
+  const snap = async (list: LibItem[]) => {
+    for (let i = 0; i < list.length; i++) {
+      const it = list[i];
+      setProgress(list.length > 1 ? `Превью ${i + 1} из ${list.length}: ${it.name}` : `Превью: ${it.name}`);
+      const sample = /text|текст|title|титр/i.test(`${it.category} ${it.name}`) ? "text" : "shape";
+      const r = await runTool(makePreview, { item: it, outDir: previewDirFor(it), sample });
+      if (!r?.ok || !r.data?.ok) break;
+      await waitForFiles(r.data.files as string[]);
+      await runTool(removeItems, { ids: r.data.cleanup as number[] });
+    }
+    setProgress("");
+    rescan();
+  };
+
   const apply = async (it: LibItem) => {
     recordUse(`lib:${it.path}`);
     const r = await runTool(libImport, { item: it });
@@ -93,6 +109,7 @@ export function LibrarySection() {
           <button className="pill" onClick={() => rescan()} title="Перечитать папки">↻</button>
           {!wide && <button className="pill" onClick={() => setShowFolders(!showFolders)}>Папки</button>}
           {newItems.length > 0 && <button className="pill" onClick={() => markSeen(newItems)} title="Снять отметки «Новое»">Просмотрено</button>}
+          <button className="pill" onClick={() => runTool(savePresetDialog, {})} title="Выделите свойства/эффекты и сохраните пресет в папку библиотеки (диалог AE)">＋ Пресет</button>
         </header>
         {!wide && (
           <div className="cat-picker">
@@ -134,6 +151,14 @@ export function LibrarySection() {
         </div>
         <footer className="detail-foot">
           <span>{item ? `${KIND_LABEL[item.kind]} · ${item.category} · ${hintFor(item, sel.selected)}` : `${shown.length} ${plural(shown.length, "элемент", "элемента", "элементов")} · двойной клик — добавить`}</span>
+          {progress && <span className="hint">{progress}</span>}
+          {item?.kind === "preset" && !item.frames && (
+            <button className="btn" disabled={busy} onClick={() => snap([item])} title="Снять кадры пресета на образце">Сделать превью</button>
+          )}
+          {!item && shown.some((x) => x.kind === "preset" && !x.frames && !x.preview) && (
+            <button className="btn" disabled={busy} onClick={() => snap(shown.filter((x) => x.kind === "preset" && !x.frames && !x.preview))}
+              title="Снять превью для всех пресетов этой папки без превью">Превью для папки</button>
+          )}
           <button className="btn primary" disabled={!item || busy} onClick={() => item && apply(item)}>{item?.kind === "preset" ? "Применить" : "Добавить"}</button>
         </footer>
       </section>
@@ -159,7 +184,7 @@ function LibTile(p: { it: LibItem; on: boolean; fav: boolean; isNew: boolean; on
   return (
     <div className={`lib-tile${p.on ? " on" : ""}`} onClick={p.onPick} onDoubleClick={p.onApply} role="button" tabIndex={0} title={`${it.name}.${it.ext}\n${it.path}`}>
       <div className={`lib-thumb kind-${it.kind}`}>
-        {it.preview ? <MediaPreview path={it.preview} hover /> : <span className="lib-ext">{it.kind === "audio" ? "♪" : it.ext.toUpperCase()}</span>}
+        {it.preview ? <MediaPreview path={it.preview} frames={it.frames} hover /> : <span className="lib-ext">{it.kind === "audio" ? "♪" : it.ext.toUpperCase()}</span>}
         {it.kind === "audio" && (
           <>
             <audio ref={audio} src={fileUrl(it.path)} onEnded={() => setPlaying(false)} preload="none" />

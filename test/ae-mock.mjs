@@ -100,6 +100,7 @@ export class Layer {
   moveToBeginning() { this.atTop = true; }
   copyToComp(comp) { const c = new this.constructor({ name: this.name }); c.startTime = this.startTime; c.inPoint = this.inPoint; c.outPoint = this.outPoint; comp.attach(c, true); return c; }
   remove() { this.removed = true; }
+  applyPreset(file) { this.comp.appliedPreset = file.fsName; }
   get index() { return this.comp ? this.comp.list.indexOf(this) + 1 : 1; }
 }
 
@@ -110,21 +111,27 @@ export function makeContext(activeItem) {
   class ShapeLayer extends AVLayer {}
   class CameraLayer extends Layer {}
   class LightLayer extends Layer {}
+  const registry = new Map();
+  let nextId = 1;
   class CompItem {
     constructor(layers = []) {
+      this.id = nextId++; registry.set(this.id, this);
       Object.assign(this, { name: "Comp 1", width: 1920, height: 1080, pixelAspect: 1, duration: 10, frameRate: 25, frameDuration: 0.04, time: 1 });
       this.list = []; layers.forEach((l) => this.attach(l));
       this.markerProperty = new Prop("Marker", null, PVT.NO_VALUE, "ADBE Marker");
       const comp = this;
       this.layers = {
-        addSolid(color, name) { const l = new AVLayer({ name }); l.solidColor = color; l.source = { mainSource: new SolidSource() }; l.groups["ADBE Mask Parade"] = new Group("ADBE Mask Parade", [], { addable: { "ADBE Mask Atom": () => { const g = new Group("ADBE Mask Atom", [new Prop("Mask Path", null, PVT.SHAPE, "ADBE Mask Shape"), new Prop("Feather", [0, 0], PVT.TwoD, "ADBE Mask Feather"), new Prop("Expansion", 0, PVT.OneD, "ADBE Mask Offset")]); g.inverted = false; return g; } } }); return comp.attach(l, true); },
+        addSolid(color, name) { const l = new AVLayer({ name }); l.solidColor = color; const src = { id: nextId++, mainSource: new SolidSource(), remove() { registry.delete(this.id); } }; registry.set(src.id, src); l.source = src; l.groups["ADBE Mask Parade"] = new Group("ADBE Mask Parade", [], { addable: { "ADBE Mask Atom": () => { const g = new Group("ADBE Mask Atom", [new Prop("Mask Path", null, PVT.SHAPE, "ADBE Mask Shape"), new Prop("Feather", [0, 0], PVT.TwoD, "ADBE Mask Feather"), new Prop("Expansion", 0, PVT.OneD, "ADBE Mask Offset")]); g.inverted = false; return g; } } }); return comp.attach(l, true); },
         addNull() { const l = new AVLayer({ name: "Null" }); l.nullLayer = true; return comp.attach(l, true); },
         addCamera(name) { return comp.attach(new CameraLayer({ name }), true); },
         addShape() { const l = new ShapeLayer({ name: "Shape" }); l.groups["ADBE Root Vectors Group"] = vectorsGroup("ADBE Root Vectors Group"); return comp.attach(l, true); },
         precompose(idx, name) { comp.precomposed = { idx, name }; return { name }; },
+        addText(text) { return comp.attach(makeText("Text", { text, fontSize: 36, applyFill: true, fillColor: [1, 1, 1] }), true); },
         add(source) { const l = new AVLayer({ name: source.name }); l.source = source; return comp.attach(l, true); },
       };
     }
+    saveFrameToPng(t, f) { ctx.savedFrames = [...(ctx.savedFrames ?? []), { t, file: f.fsName }]; }
+    remove() { this.removed = true; registry.delete(this.id); }
     attach(l, top = false) { l.comp = this; if (top) this.list.unshift(l); else this.list.push(l); return l; }
     get numLayers() { return this.list.length; }
     layer(i) { return this.list[i - 1]; }
@@ -139,20 +146,22 @@ export function makeContext(activeItem) {
     get parentFolder() { return this._parent; } set parentFolder(f) { if (this._parent) this._parent.list = this._parent.list.filter((x) => x !== this); this._parent = f; f.list.push(this); } }
   const files = new Set();
   class File { constructor(p) { this.fsName = p; } get exists() { return files.has(this.fsName); } get parent() { return new Folder(this.fsName.replace(/[\\/][^\\/]*$/, "")); } }
-  class Folder { constructor(p) { this.fsName = p; } get exists() { return files.has(this.fsName + "/"); } execute() { ctx.revealed = this.fsName; } }
+  class Folder { constructor(p) { this.fsName = p; } get exists() { return files.has(this.fsName + "/"); } execute() { ctx.revealed = this.fsName; } create() { files.add(this.fsName + "/"); return true; } }
   Folder.selectDialog = () => new Folder("C:/Библиотека");
   class ImportOptions { constructor(f) { this.file = f; } canImportAs() { return /\.aep$/i.test(this.file.fsName); } }
   const root = new FolderItem("root");
   function vectorsGroup(m) {
-    return new Group(m, [], { addable: {
-      "ADBE Vector Group": () => new Group("ADBE Vector Group", [vectorsGroup("ADBE Vectors Group")]),
+    return Object.assign(new Group(m, [], { addable: {
+      "ADBE Vector Group": () => new Group("ADBE Vector Group", [vectorsGroup("ADBE Vectors Group"), new Group("ADBE Vector Transform Group", [
+        new Prop("Anchor", [0, 0], PVT.TwoD_SPATIAL, "ADBE Vector Anchor"), new Prop("Position", [0, 0], PVT.TwoD_SPATIAL, "ADBE Vector Position"),
+        new Prop("Scale", [100, 100], PVT.TwoD, "ADBE Vector Scale"), new Prop("Rotation", 0, PVT.OneD, "ADBE Vector Rotation"), new Prop("Opacity", 100, PVT.OneD, "ADBE Vector Group Opacity")])]),
       "ADBE Vector Shape - Group": () => new Group("", [new Prop("Path", null, PVT.SHAPE, "ADBE Vector Shape")]),
       "ADBE Vector Shape - Ellipse": () => new Group("", [new Prop("Size", [100, 100], PVT.TwoD, "ADBE Vector Ellipse Size")]),
       "ADBE Vector Shape - Rect": () => new Group("", [new Prop("Size", [100, 100], PVT.TwoD, "ADBE Vector Rect Size"), new Prop("Roundness", 0, PVT.OneD, "ADBE Vector Rect Roundness")]),
       "ADBE Vector Graphic - Fill": () => new Group("", [new Prop("Color", [1, 1, 1, 1], PVT.COLOR, "ADBE Vector Fill Color"), new Prop("Opacity", 100, PVT.OneD, "ADBE Vector Fill Opacity")]),
       "ADBE Vector Graphic - Stroke": () => new Group("", [new Prop("Color", [1, 1, 1, 1], PVT.COLOR, "ADBE Vector Stroke Color"), new Prop("Stroke Width", 2, PVT.OneD, "ADBE Vector Stroke Width"), new Prop("Line Cap", 1, PVT.NO_VALUE, "ADBE Vector Stroke Line Cap"), new Prop("Opacity", 100, PVT.OneD, "ADBE Vector Stroke Opacity")]),
       "ADBE Vector Filter - Trim": () => new Group("", [new Prop("Start", 0, PVT.OneD, "ADBE Vector Trim Start"), new Prop("End", 100, PVT.OneD, "ADBE Vector Trim End")]),
-    } });
+    } }), { propertyType: PT.INDEXED_GROUP });
   }
   function makeText(name, doc) {
     const l = new TextLayer({ name });
@@ -171,11 +180,12 @@ export function makeContext(activeItem) {
 
   const ctx = {
     CompItem, AVLayer, TextLayer, ShapeLayer, CameraLayer, LightLayer, SolidSource, KeyframeEase, Shape, MarkerValue,
-    FolderItem, FootageItem, File, Folder, ImportOptions, ImportAsType: { PROJECT: 1, FOOTAGE: 2 },
+    FolderItem, FootageItem, File, Folder, ImportOptions, ImportAsType: { PROJECT: 1, FOOTAGE: 2 }, ParagraphJustification: { CENTER_JUSTIFY: 7413 },
     PropertyValueType: PVT, PropertyType: PT,
     KeyframeInterpolationType: { LINEAR, BEZIER, HOLD: 6614 },
     app: { version: "26.5x89", project: { activeItem: null, numItems: 3, removeUnusedFootage: () => 2, rootFolder: root,
-      items: { addFolder: (n) => { const f = new FolderItem(n); f.parentFolder = root; return f; } },
+      items: { addFolder: (n) => { const f = new FolderItem(n); f.parentFolder = root; return f; }, addComp: (n, w, h) => { const c = new CompItem([]); c.name = n; c.width = w; c.height = h; return c; } },
+      itemByID: (id) => registry.get(id) ?? null,
       importFile: (io) => {
         ctx.imports = (ctx.imports ?? 0) + 1;
         const base = io.file.fsName.split(/[\\/]/).pop().replace(/\.[^.]+$/, "");

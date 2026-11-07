@@ -4,6 +4,7 @@ import { layersWord } from "../lib/format";
 import { motion, type MotionInput } from "../tools/ae/motion";
 import { sceneTransition, type SceneKind } from "../tools/ae/scene";
 import { libImport } from "../tools/ae/library";
+import { carousel } from "../tools/ae/mtools";
 import type { LibItem } from "../lib/library";
 import { act, AT_SEG, DIR_SEG, slider, type Ctl, type Pose, type Preset, type Values } from "./types";
 
@@ -143,3 +144,25 @@ export function libraryTransitions(items: LibItem[]): Preset[] {
       build: () => act(libImport, { item: it }),
     }));
 }
+
+// ---------- карусель ----------
+function carouselPose(v: Values, i: number, t: number): Pose {
+  const step = v.hold + v.move, n = 3;
+  const k = Math.min(n - 1, Math.floor(t / step)), local = t - k * step;
+  const m = local <= v.hold || k >= n - 1 ? 0 : easeOut("smooth", (local - v.hold) / v.move);
+  const pos = k + m, d = i - pos, ad = Math.abs(d);
+  const pose: Pose = { x: d * 62 };
+  if (v.mode === "cover") { pose.s = ad < 1 ? 1 - 0.25 * ad : Math.max(0.6, 0.75 - 0.15 * (ad - 1)); pose.o = ad < 1 ? 1 - 0.4 * ad : Math.max(0, 0.6 - 0.6 * (ad - 1)); }
+  return pose;
+}
+const carouselPreset = (id: string, title: string, subtitle: string, mode: "slide" | "cover"): Preset => ({
+  id, title, subtitle, group: "Карусель",
+  controls: [slider("hold", "Пауза в центре", 1, 0, 10, 0.1, "с"), slider("move", "Переезд", 0.6, 0.1, 5, 0.05, "с"), slider("spacing", "Шаг между слоями", 1100, 50, 5000, 10, "px")],
+  preview: (v) => ({ kind: "layers", count: 3, length: 3 * (v.hold + v.move), pose: (i, t) => carouselPose({ ...v, mode }, i, t) }),
+  hint: (_v, sel) => (sel.selected > 1 ? `${layersWord(sel.selected)} по порядку в таймлайне, от текущего времени` : "Выделите минимум два слоя"),
+  build: (v) => act(carousel, { title, mode, hold: v.hold, move: v.move, spacing: v.spacing }),
+});
+export const CAROUSELS: Preset[] = [
+  carouselPreset("carousel", "Карусель", "Слои по очереди выезжают в центр", "slide"),
+  carouselPreset("carouselCover", "Карусель-обложки", "Центр крупно, соседи меньше", "cover"),
+];

@@ -23,6 +23,7 @@ function fresh() {
   h.comp.attach(new h.Layer({ name: "B", pos: [300, 200] }));
   const inner = new h.ctx.CompItem([]); inner.attach(new h.Layer({ name: "внутри" }));
   const pre = h.comp.attach(new h.Layer({ name: "Прекомп" })); pre.source = inner;
+  h.run("ae.element", { kind: "circle" }); h.run("ae.element", { kind: "frame" }); // два шейп-слоя для «Слить шейпы»
   const t = h.comp.attach(h.makeText("Текст", { text: "Привет мир", font: "Arial", fontSize: 50, applyFill: true, fillColor: [1, 1, 1] }));
   const pos = a.property("ADBE Transform Group").property("ADBE Position");
   pos.setValueAtTime(0, [0, 0]); pos.setValueAtTime(2, [500, 0]); pos.selectedKeysList = [1, 2];

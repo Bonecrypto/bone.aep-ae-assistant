@@ -23,6 +23,7 @@ export function Preview({ spec, replay }: { spec: PreviewSpec; replay: number })
   useEffect(() => { start.current = performance.now(); }, [replay, spec]);
   useEffect(() => {
     if (spec.kind === "node" || spec.kind === "media") return;
+    // для label тоже нужен цикл времени
     let raf = 0;
     const loop = () => {
       const len = spec.length + HOLD;
@@ -35,6 +36,7 @@ export function Preview({ spec, replay }: { spec: PreviewSpec; replay: number })
 
   if (spec.kind === "node") return <div className="stage">{spec.node}</div>;
   if (spec.kind === "media") return <div className="stage"><MediaPreview path={spec.path} /></div>;
+  if (spec.kind === "label") return <div className="stage"><div className="stage-counter">{spec.text(Math.min(t, spec.length))}</div></div>;
 
   if (spec.kind === "cut") {
     const cut = spec.length / 2, near = Math.max(0, 1 - Math.abs(t - cut) / (spec.length / 2));
@@ -76,9 +78,17 @@ export function Preview({ spec, replay }: { spec: PreviewSpec; replay: number })
   );
 }
 
-/** Видео/гифка/картинка из папки пользователя. Видео играет без звука по кругу. */
-export function MediaPreview({ path, hover }: { path: string; hover?: boolean }) {
+/** Видео/гифка/картинка из папки пользователя. Видео играет без звука по кругу. Кадры (frames) — как флипбук. */
+export function MediaPreview({ path, hover, frames }: { path: string; hover?: boolean; frames?: string[] }) {
+  const [f, setF] = useState(-1);
+  const timer = useRef<any>(null);
   const url = fileUrl(path);
+  if (frames && frames.length > 1) {
+    const play = () => { let i = 0; clearInterval(timer.current); timer.current = setInterval(() => { setF(i % frames.length); i++; }, 90); };
+    const stop = () => { clearInterval(timer.current); setF(-1); };
+    return <img className="media" src={f >= 0 ? fileUrl(frames[f]) : url} alt="" onMouseEnter={hover ? play : undefined} onMouseLeave={hover ? stop : undefined}
+      ref={(el) => { if (el && !hover && f < 0) play(); }} />;
+  }
   if (/\.(mp4|webm)$/i.test(path)) {
     return <video className="media" src={url} muted loop playsInline autoPlay={!hover}
       onMouseEnter={(e) => hover && e.currentTarget.play().catch(() => {})} onMouseLeave={(e) => { if (hover) { e.currentTarget.pause(); e.currentTarget.currentTime = 0; } }} />;

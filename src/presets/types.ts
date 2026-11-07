@@ -21,6 +21,8 @@ export type PreviewSpec =
   | { kind: "node"; node: ReactNode }
   /** Склейка двух кадров: i=0 — кадр A (до склейки), i=1 — кадр B. */
   | { kind: "cut"; length: number; pose: (i: number, t: number) => Pose; flash?: number; dip?: boolean }
+  /** Меняющаяся надпись (счётчики). */
+  | { kind: "label"; length: number; text: (t: number) => string }
   /** Превью-файл пользователя (видео/картинка). */
   | { kind: "media"; path: string };
 

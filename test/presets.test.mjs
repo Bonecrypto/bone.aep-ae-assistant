@@ -94,3 +94,20 @@ test("id пресетов уникальны внутри вкладки", () =>
     assert.deepEqual(dup, [], `${tab}: повторяются ${dup.join(", ")}`);
   }
 });
+
+test("счётчики: выражение даёт правильный текст в начале, середине и конце маркера", () => {
+  const c = Object.fromEntries(TABS_PRESETS.create.presets.filter((p) => p.group === "Счётчики").map((p) => [p.id, p]));
+  const run = (p, v, time) => {
+    const a = p.build({ ...defaults(p), ...v }).input;
+    const fx = Object.fromEntries(a.controls.map((x) => [x.name.split("@@").join("1"), x.value]));
+    const mk = { comment: a.marker.name.split("@@").join("1"), time: 1, duration: a.marker.duration };
+    return evalExpr(a.code.split("@@").join("1"), { effect: (n) => () => { if (!(n in fx)) throw new Error("нет " + n); return fx[n]; }, time, thisLayer: layerWith([mk]) });
+  };
+  assert.equal(run(c.count, { from: 0, to: 1500, ease: "linear", duration: 2 }, 0), "0");
+  assert.equal(run(c.count, { from: 0, to: 1500, ease: "linear", duration: 2 }, 3), "1\u00a0500");
+  assert.equal(run(c.percent, { ease: "linear", duration: 1 }, 1.5), "50%");
+  assert.equal(run(c.money, { from: 0, to: 250000, cur: "usd", ease: "linear", duration: 2 }, 3), "$250,000");
+  assert.equal(run(c.money, { from: 0, to: 1234.5, decimals: 2, cur: "rub", ease: "linear", duration: 2 }, 3), "1\u00a0234,50\u00a0₽");
+  assert.equal(run(c.timer, { from: 90, to: 0, ease: "linear", duration: 90 }, 1), "01:30");
+  assert.equal(run(c.timer, { from: 3700, to: 0, ease: "linear", duration: 10 }, 0), "1:01:40");
+});

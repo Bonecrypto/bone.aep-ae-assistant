@@ -1,4 +1,4 @@
-import type { JSX } from "react";
+import { useEffect, useRef, type JSX } from "react";
 import { runTool } from "../lib/actions";
 import { useBusy } from "../lib/busy";
 import { useLibrary, type LibItem } from "../lib/library";
@@ -75,10 +75,36 @@ export function Dock() {
   const unpin = (key: string) => setPrefs({ favorites: getPrefs().favorites.filter((f) => f !== key) });
   const pin = (key: string) => setPrefs({ favorites: [...getPrefs().favorites, key] });
 
-  const btn = (e: Entry, isPinned: boolean) => (
+  // Ctrl+1…9 — первые девять кнопок колонки
+  const all = [...pinned, ...often];
+  const ref = useRef(all);
+  ref.current = all;
+  useEffect(() => {
+    const onKey = (ev: KeyboardEvent) => {
+      if (!(ev.ctrlKey || ev.metaKey) || !/^Digit[1-9]$/.test(ev.code)) return;
+      const e = ref.current[Number(ev.code.slice(5)) - 1];
+      if (e) { ev.preventDefault(); e.run(); }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+
+  // перетаскивание: меняет порядок избранного
+  const drag = useRef<string | null>(null);
+  const drop = (target: string) => {
+    const from = drag.current;
+    drag.current = null;
+    if (!from || from === target) return;
+    const list = getPrefs().favorites.filter((f) => f !== from);
+    list.splice(list.indexOf(target), 0, from);
+    setPrefs({ favorites: list });
+  };
+
+  const btn = (e: Entry, isPinned: boolean, n: number) => (
     <button key={e.key} className="dock-btn" disabled={busy} onClick={e.run}
+      draggable={isPinned} onDragStart={() => { drag.current = e.key; }} onDragOver={(ev) => isPinned && ev.preventDefault()} onDrop={() => isPinned && drop(e.key)}
       onContextMenu={(ev) => { ev.preventDefault(); isPinned ? unpin(e.key) : pin(e.key); }}
-      title={`${e.title} — ${e.group}\nКлик — применить с последними настройками\nПравый клик — ${isPinned ? "убрать из избранного" : "закрепить"}`}>
+      title={`${e.title} — ${e.group}${n <= 9 ? `  (Ctrl+${n})` : ""}\nКлик — применить с последними настройками\nПравый клик — ${isPinned ? "убрать из избранного" : "закрепить"}${isPinned ? "\nПеретащите, чтобы поменять порядок" : ""}`}>
       {e.glyph}
     </button>
   );
@@ -88,9 +114,9 @@ export function Dock() {
       {pinned.length === 0 && often.length === 0 && (
         <div className="dock-empty" title="Отмечайте пресеты звёздочкой — они появятся здесь. Частые действия добавятся сами."><IconStar /></div>
       )}
-      {pinned.map((e) => btn(e, true))}
+      {pinned.map((e, i) => btn(e, true, i + 1))}
       {often.length > 0 && <div className="dock-sep" title="Часто используемые" />}
-      {often.map((e) => btn(e, false))}
+      {often.map((e, i) => btn(e, false, pinned.length + i + 1))}
     </nav>
   );
 }

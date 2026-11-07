@@ -3,7 +3,7 @@ import { precompose, sequence, labelByType, removeUnused } from "../tools/ae/ser
 import { motionBlur } from "../tools/ae/animate";
 import { glass } from "../tools/ae/glass";
 import { align, anchor, distribute, reverseKeys, splitText } from "../tools/ae/layout";
-import { cloneKeys, extract, quickEase, toShapes } from "../tools/ae/mtools";
+import { cloneKeys, extract, mergeShapes, quickEase, toShapes } from "../tools/ae/mtools";
 import { ELEMENT_ITEMS, EFFECT_ITEMS, LAYER_ITEMS } from "./create";
 import { layersWord } from "../lib/format";
 import { act, slider, type Preset } from "./types";
@@ -117,6 +117,8 @@ export const SERVICE_PRESETS: Preset[] = [
     hint: (_v, sel) => (sel.keys ? `Ключей: ${sel.keys} → в текущее время` : "Выделите ключи и поставьте указатель"), build: () => act(cloneKeys, {}) },
   { id: "extract", title: "Достать из прекомпа", subtitle: "Слои обратно в композицию", group: "Слои", controls: [],
     hint: () => "Выделите прекомп: слои встанут на те же места, прекомп выключится", build: () => act(extract, {}) },
+  { id: "merge", title: "Слить шейпы", subtitle: "Несколько шейп-слоёв в один", group: "Слои", controls: [],
+    hint: () => "Выделите шейп-слои: всё сольётся в верхний, остальные выключатся", build: () => act(mergeShapes, {}) },
   { id: "toShapes", title: "В шейпы", subtitle: "Текст или Illustrator → шейп-слои", group: "Слои", controls: [],
     hint: () => "Выделите текстовый слой или слой .ai", build: () => act(toShapes, {}) },
   { id: "reverse", title: "Развернуть ключи", subtitle: "Анимация задом наперёд", group: "Ключи", controls: [],

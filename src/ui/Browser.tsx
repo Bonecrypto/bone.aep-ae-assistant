@@ -99,6 +99,7 @@ export function Browser({ id, title, presets, footerHint }: { id: string; title:
               <button className="pill code-copy" onClick={() => copyText(preset.code!(v))}>Копировать</button>
             </div>
           )}
+          {preset.controls.length > 0 && <Variants vkey={`${id}:${preset.id}`} values={v} onLoad={(nv) => setValues({ ...values, [preset.id]: nv })} />}
           <Controls controls={preset.controls} values={v} onChange={(nv) => setValues({ ...values, [preset.id]: nv })} />
         </div>
         <footer className="detail-foot">
@@ -115,4 +116,35 @@ export function applyPreset(p: Preset, v: Values) {
   if (p.run) return p.run(v);
   if (p.build) { const a = p.build(v); return runTool(a.tool, a.input); }
   return Promise.resolve(null);
+}
+
+/** Свои варианты настроек пресета: сохранить текущие ползунки под именем и вернуть одним кликом. */
+function Variants({ vkey, values, onLoad }: { vkey: string; values: Values; onLoad: (v: Values) => void }) {
+  const { variants } = usePrefs();
+  const list = variants[vkey] ?? [];
+  const [naming, setNaming] = useState(false);
+  const [name, setName] = useState("");
+  const save = () => {
+    const n = name.trim() || `Вариант ${list.length + 1}`;
+    setPrefs({ variants: { ...variants, [vkey]: [...list.filter((x) => x.name !== n), { name: n, values }] } });
+    setNaming(false); setName("");
+  };
+  const remove = (n: string) => setPrefs({ variants: { ...variants, [vkey]: list.filter((x) => x.name !== n) } });
+  return (
+    <div className="variants">
+      {list.map((x) => (
+        <button key={x.name} className="chip" onClick={() => onLoad(x.values)} onContextMenu={(e) => { e.preventDefault(); remove(x.name); }}
+          title="Клик — загрузить настройки, правый клик — удалить">{x.name}</button>
+      ))}
+      {naming ? (
+        <span className="variant-new">
+          <input autoFocus value={name} placeholder="Название" onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") save(); if (e.key === "Escape") setNaming(false); }} />
+          <button className="chip on" onClick={save}>OK</button>
+        </span>
+      ) : (
+        <button className="chip ghost" onClick={() => setNaming(true)} title="Сохранить текущие настройки как свой вариант">＋ Сохранить вариант</button>
+      )}
+    </div>
+  );
 }

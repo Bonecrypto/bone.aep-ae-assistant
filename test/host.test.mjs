@@ -503,3 +503,53 @@ test("по очереди группами и с отступом", () => {
   h.run("ae.sequence", { mode: "time", stepFrames: 5, groupSize: 2, offsetFrames: 10 });
   assert.deepEqual(ls.map((l) => Math.round(l.startTime * 100) / 100), [0.4, 0.4, 0.6, 0.6]);
 });
+
+
+// ---------- 0.11: превью пресетов, карусель, слияние шейпов, счётчики ----------
+test("превью .ffx: временная композиция, пресет на образец, 10 кадров + обложка, уборка по id", () => {
+  const h = makeContext([]);
+  h.files.add("C:/Lib/01_Text/gold.ffx");
+  const r = h.run("ae.makePreview", { preset: "C:/Lib/01_Text/gold.ffx", outDir: "C:/Lib/01_Text/_previews", base: "gold", sample: "text" });
+  assert.equal(r.ok, true, JSON.stringify(r)); assert.equal(r.frames, 11);
+  assert.equal(h.ctx.savedFrames.length, 11); assert.match(h.ctx.savedFrames[0].file, /gold__01\.png$/); assert.match(h.ctx.savedFrames[10].file, /gold\.png$/);
+  assert.equal(r.cleanup.length, 2);
+  assert.equal(h.run("ae.removeItems", { ids: r.cleanup }).removed, 2);
+});
+
+test("карусель: каждый слой по очереди в центре кадра", () => {
+  const h = makeContext([]);
+  const ls = [0, 1, 2].map(() => h.comp.attach(new h.Layer()));
+  const r = h.run("ae.carousel", { mode: "cover", hold: 1, move: 0.5, spacing: 600 });
+  assert.equal(r.ok, true); assert.equal(r.length, 4);
+  const xAt = (l, t) => { const k = l.property("ADBE Transform Group").property("ADBE Position").keys.find((q) => Math.abs(q.t - t) < 1e-9); return k.v[0]; };
+  assert.equal(xAt(ls[0], 1), 960); assert.equal(xAt(ls[1], 1), 1560);
+  assert.equal(xAt(ls[1], 2.5), 960); assert.equal(xAt(ls[2], 4), 960);
+  const op = ls[2].property("ADBE Transform Group").property("ADBE Opacity").keys[0].v;
+  assert.equal(op, 0, "далёкий слой в обложках прозрачный");
+});
+
+test("слить шейпы: содержимое нижних — группами в верхний, нижние выключены", () => {
+  const h = makeContext([]);
+  h.run("ae.element", { kind: "circle" }); h.run("ae.element", { kind: "frame" });
+  const [top, bottom] = [h.comp.layer(1), h.comp.layer(2)];
+  [top, bottom].forEach((l) => { l.selected = true; });
+  bottom.property("ADBE Transform Group").property("ADBE Position").value = [1000, 600];
+  const r = h.run("ae.mergeShapes", {});
+  assert.equal(r.ok, true, JSON.stringify(r));
+  const groups = top.property("ADBE Root Vectors Group").children;
+  assert.equal(groups.length, 2); assert.equal(groups[1].name, bottom.name);
+  const inner = groups[1].property("ADBE Vectors Group").children.map((c) => c.matchName);
+  assert.deepEqual(inner, ["ADBE Vector Group"]);
+  assert.deepEqual(plain(groups[1].property("ADBE Vector Transform Group").property("ADBE Vector Position").value), [40, 60]);
+  assert.equal(bottom.enabled, false);
+});
+
+test("счётчик: текстовый слой, выражение на Source Text, ползунки и маркер", () => {
+  const h = makeContext([]);
+  const r = h.run("ae.textCounter", { name: "Деньги", code: 'effect("Счётчик@@ · от")(1)', controls: [{ name: "Счётчик@@ · от", value: 5 }], marker: { name: "Деньги @@", duration: 2 } });
+  assert.equal(r.ok, true);
+  const l = h.comp.layer(1);
+  assert.equal(l.name, "Деньги");
+  assert.equal(l.property("ADBE Text Properties").property("ADBE Text Document").expression, 'effect("Счётчик1 · от")(1)');
+  assert.equal(l.property("ADBE Marker").keys[0].v.duration, 2);
+});

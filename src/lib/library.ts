@@ -9,7 +9,7 @@ import { logError } from "./errorlog";
  * Панель следит за папкой и помечает новое и изменённое.
  */
 export type LibKind = "template" | "preset" | "video" | "image" | "audio";
-export type LibItem = { path: string; name: string; ext: string; kind: LibKind; category: string; root: string; preview?: string; mtime: number; size: number };
+export type LibItem = { path: string; name: string; ext: string; kind: LibKind; category: string; root: string; preview?: string; frames?: string[]; mtime: number; size: number };
 
 const KIND: Record<string, LibKind> = {
   aep: "template", aepx: "template", ffx: "preset",
@@ -82,7 +82,10 @@ export function scanRoot(req: NodeRequire, root: string, problems: ScanProblem[]
         }
         return kind === "image" && ["png", "jpg", "jpeg", "gif"].includes(ext) ? full : kind === "video" && ["mp4", "webm"].includes(ext) ? full : undefined;
       };
-      items.push({ path: full, name: baseOf(f), ext, kind, category: rel || "Разное", root, preview: findPreview(), mtime: st.mtimeMs, size: st.size });
+      // кадры превью от «Сделать превью»: _previews/<имя>__01.png, __02.png …
+      const fb = baseOf(f).toLowerCase() + "__";
+      const frames = previewFiles.filter((x) => x.toLowerCase().startsWith(fb) && /\.png$/i.test(x)).sort().map((x) => path.join(previewsDir, x));
+      items.push({ path: full, name: baseOf(f), ext, kind, category: rel || "Разное", root, preview: findPreview(), frames: frames.length > 1 ? frames : undefined, mtime: st.mtimeMs, size: st.size });
     }
     if (depth < 8) for (const d of dirs) walk(d, depth + 1);
   };
@@ -200,3 +203,22 @@ function demoItems(): LibItem[] {
 }
 
 export const getLibraryItems = () => state.items;
+
+/** Ждать появления файлов на диске (AE может дописывать кадры асинхронно). */
+export async function waitForFiles(files: string[], timeoutMs = 20000) {
+  const req = nodeRequire();
+  if (!req) return true;
+  const fs = req("fs"), started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    if (files.every((f) => { try { return fs.statSync(f).size > 0; } catch { return false; } })) return true;
+    await new Promise((r) => setTimeout(r, 300));
+  }
+  return false;
+}
+
+/** Папка _previews рядом с файлом. */
+export function previewDirFor(it: LibItem) {
+  const req = nodeRequire();
+  const path = req ? req("path") : null;
+  return path ? path.join(path.dirname(it.path), "_previews") : it.path.replace(/[\\/][^\\/]*$/, "/_previews");
+}

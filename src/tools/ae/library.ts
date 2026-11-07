@@ -19,6 +19,25 @@ export const libImport = hostTool<{ item: LibItem }>({
   },
 });
 
+export const makePreview = hostTool<{ item: LibItem; outDir: string; sample: "text" | "shape" }>({
+  name: "ae.makePreview",
+  title: (i) => (i.item ? `Превью: ${i.item.name}` : "Превью"),
+  description: "Внутренний инструмент: снять кадры пресета для превью.",
+  inputSchema: { type: "object", properties: {} },
+  mutates: false,
+  toArgs: (i) => ({ preset: i.item.path, outDir: i.outDir, base: i.item.name, sample: i.sample, frames: 10, sampleText: "Текст" }),
+  done: (r, i) => `Превью «${i.item.name}»${Number.isFinite(Number(r.frames)) ? `: ${Number(r.frames)} кадров` : ""}.`,
+});
+
+export const removeItems = hostTool<{ ids: number[] }>({
+  name: "ae.removeItems", title: () => "Уборка", description: "Внутренний инструмент.", inputSchema: { type: "object", properties: {} }, mutates: false, done: () => "",
+});
+
+export const savePresetDialog = hostTool<Record<string, never>>({
+  name: "ae.savePresetDialog", title: () => "Сохранить пресет", description: "Открывает диалог AE «Save Animation Preset».",
+  inputSchema: { type: "object", properties: {} }, mutates: false, done: () => "Сохраните пресет в папку библиотеки — он сразу появится в панели.",
+});
+
 export const pickFolder = hostTool<{ prompt: string }>({
   name: "ae.pickFolder",
   title: () => "Выбор папки",

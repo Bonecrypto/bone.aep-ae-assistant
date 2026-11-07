@@ -45,9 +45,13 @@ export function openUrl(url: string) {
 export function registerShortcuts() {
   const reg = window.__adobe_cep__?.registerKeyEventsInterest;
   if (!reg) return;
+  const digitsWin = [49, 50, 51, 52, 53, 54, 55, 56, 57];      // 1..9 на Windows
+  const digitsMac = [18, 19, 20, 21, 23, 22, 26, 28, 25];      // 1..9 на macOS
   reg(JSON.stringify([
     { keyCode: 75, ctrlKey: true },
     { keyCode: 40, metaKey: true },
+    ...digitsWin.map((keyCode) => ({ keyCode, ctrlKey: true })),
+    ...digitsMac.map((keyCode) => ({ keyCode, metaKey: true })),
   ]));
 }
 
