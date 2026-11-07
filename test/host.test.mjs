@@ -456,3 +456,50 @@ test("разбить текст по словам: слой на слово, о�
   assert.match(sel.property("ADBE Text Expressible Amount").expression, /textIndex == 2/);
   assert.equal(t.enabled, false);
 });
+
+
+// ---------- 0.10: инструменты в духе Motion Tools ----------
+test("быстрый ease: на одиночный ключ, только вход", () => {
+  const { run, tr, l } = one();
+  const p = tr.property("ADBE Opacity");
+  p.setValueAtTime(0, 0); p.setValueAtTime(1, 100); p.selectedKeysList = [2]; l.selectedProperties = [p];
+  assert.equal(run("ae.quickEase", { inInfluence: 80, outInfluence: 20, which: "in" }).changed, 1);
+  assert.equal(p.keys[1].inE[0].influence, 80); assert.equal(p.keys[1].outE[0].influence, 16.666);
+  p.selectedKeysList = [];
+  assert.equal(run("ae.quickEase", { inInfluence: 50, outInfluence: 50 }).code, "NO_KEYS_SELECTED");
+});
+
+test("клонировать ключи: копия на указателе с теми же интервалами", () => {
+  const { run, tr, l, comp } = one();
+  const p = tr.property("ADBE Opacity");
+  p.setValueAtTime(0.2, 0); p.setValueAtTime(0.7, 100); p.selectedKeysList = [1, 2]; l.selectedProperties = [p];
+  comp.time = 3;
+  run("ae.cloneKeys", {});
+  assert.deepEqual(p.keys.map((k) => [Math.round(k.t * 10) / 10, k.v]), [[0.2, 0], [0.7, 100], [3, 0], [3.5, 100]]);
+});
+
+test("достать из прекомпа: слои в композиции, со сдвигом времени, под null, прекомп выключен", () => {
+  const h = makeContext([]);
+  const inner = new h.ctx.CompItem([]); inner.name = "Пре";
+  inner.attach(new h.Layer({ name: "Лого" })); inner.attach(new h.Layer({ name: "Фон" }));
+  const pre = h.comp.attach(new h.Layer({ name: "Пре" })); pre.source = inner; pre.startTime = 2;
+  const r = h.run("ae.extract", {});
+  assert.equal(r.changed, 2); assert.equal(pre.enabled, false);
+  const names = h.comp.list.map((l) => l.name);
+  assert.deepEqual(names.slice(0, 3), ["Лого", "Фон", "Пре"], "порядок как в прекомпе, null с именем прекомпа");
+  assert.equal(h.comp.layer(1).startTime, 2); assert.equal(h.comp.layer(1).parent.nullLayer, true);
+  assert.equal(makeContext([]).run("ae.extract", {}).code, "NO_PRECOMP");
+});
+
+test("в шейпы: команда меню AE, для текста — своя", () => {
+  const h = makeContext([]);
+  h.comp.attach(h.makeText("T", { text: "a" }));
+  assert.equal(h.run("ae.toShapes", {}).ok, true); assert.equal(h.ctx.lastCommand, 3781);
+});
+
+test("по очереди группами и с отступом", () => {
+  const h = makeContext([]);
+  const ls = [0, 1, 2, 3].map(() => h.comp.attach(new h.Layer()));
+  h.run("ae.sequence", { mode: "time", stepFrames: 5, groupSize: 2, offsetFrames: 10 });
+  assert.deepEqual(ls.map((l) => Math.round(l.startTime * 100) / 100), [0.4, 0.4, 0.6, 0.6]);
+});

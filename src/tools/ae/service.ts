@@ -11,7 +11,7 @@ export const precompose = hostTool<{ name?: string }>({
   done: (r) => `Прекомпоз «${String(r.comp)}»: ${layersWord(Number(r.changed))}.${undoHint}`,
 });
 
-export const sequence = hostTool<{ mode: "time" | "markers"; stepFrames?: number; reverse?: boolean }>({
+export const sequence = hostTool<{ mode: "time" | "markers"; stepFrames?: number; reverse?: boolean; offsetFrames?: number; groupSize?: number }>({
   name: "ae.sequence",
   title: (i) => (i.mode === "markers" ? "Разложить по маркерам" : "Разложить по очереди"),
   description:

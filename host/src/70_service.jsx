@@ -40,7 +40,10 @@
     } else {
       var step = (args.stepFrames > 0 ? args.stepFrames : 5) * comp.frameDuration;
       var first = layers[0].inPoint;
-      for (var i = 0; i < layers.length; i++) times.push(first + i * step);
+      // groupSize > 1: слои стартуют пачками (1-2-3 вместе, потом 4-5-6...)
+      var group = args.groupSize > 1 ? Math.round(args.groupSize) : 1;
+      var offset = (args.offsetFrames || 0) * comp.frameDuration;
+      for (var i = 0; i < layers.length; i++) times.push(first + offset + Math.floor(i / group) * step);
     }
 
     var changed = 0;

@@ -98,6 +98,7 @@ export class Layer {
   moveBefore(other) { this.movedBefore = other; }
   moveAfter(other) { if (this.comp) { const L = this.comp.list; L.splice(L.indexOf(this), 1); L.splice(L.indexOf(other) + 1, 0, this); } }
   moveToBeginning() { this.atTop = true; }
+  copyToComp(comp) { const c = new this.constructor({ name: this.name }); c.startTime = this.startTime; c.inPoint = this.inPoint; c.outPoint = this.outPoint; comp.attach(c, true); return c; }
   remove() { this.removed = true; }
   get index() { return this.comp ? this.comp.list.indexOf(this) + 1 : 1; }
 }
@@ -185,7 +186,8 @@ export function makeContext(activeItem) {
           f.list.push(inner, main); f.parentFolder = root; return f;
         }
         const it = new FootageItem(base); it.parentFolder = root; return it;
-      } }, beginUndoGroup: (n) => undo.push("begin:" + n), endUndoGroup: () => undo.push("end") },
+      } }, beginUndoGroup: (n) => undo.push("begin:" + n), endUndoGroup: () => undo.push("end"),
+      findMenuCommandId: () => 0, executeCommand: (id) => { ctx.lastCommand = id; if (ctx.app.project.activeItem) ctx.app.project.activeItem.attach(new AVLayer({ name: "Shapes" }), true); } },
   };
   ctx.$ = { global: ctx };
   // host выполняется в том же «мире», что и тест: те же Array/Object, без vm-песочницы

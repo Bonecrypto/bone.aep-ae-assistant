@@ -3,6 +3,7 @@ import { precompose, sequence, labelByType, removeUnused } from "../tools/ae/ser
 import { motionBlur } from "../tools/ae/animate";
 import { glass } from "../tools/ae/glass";
 import { align, anchor, distribute, reverseKeys, splitText } from "../tools/ae/layout";
+import { cloneKeys, extract, quickEase, toShapes } from "../tools/ae/mtools";
 import { ELEMENT_ITEMS, EFFECT_ITEMS, LAYER_ITEMS } from "./create";
 import { layersWord } from "../lib/format";
 import { act, slider, type Preset } from "./types";
@@ -105,6 +106,19 @@ export const SERVICE_PRESETS: Preset[] = [
     hint: () => "Выделите минимум три слоя — крайние останутся на месте",
     build: (v) => act(distribute, { axis: v.axis }),
   },
+  {
+    id: "quickEase", title: "Быстрый ease", subtitle: "Influence на выделенные ключи", group: "Ключи",
+    controls: [slider("inInf", "Вход «<»", 66, 0.1, 100, 1, "%"), slider("outInf", "Выход «>»", 66, 0.1, 100, 1, "%"),
+      { type: "seg", key: "which", label: "Что", value: "both", options: [{ value: "in", label: "Вход" }, { value: "both", label: "Оба" }, { value: "out", label: "Выход" }] }],
+    hint: (_v, sel) => (sel.keys ? `Выделено ключей: ${sel.keys}` : "Выделите ключи — можно и один"),
+    build: (v) => act(quickEase, { inInfluence: v.inInf, outInfluence: v.outInf, which: v.which }),
+  },
+  { id: "clone", title: "Клонировать ключи", subtitle: "Копия выделенных ключей на указатель", group: "Ключи", controls: [],
+    hint: (_v, sel) => (sel.keys ? `Ключей: ${sel.keys} → в текущее время` : "Выделите ключи и поставьте указатель"), build: () => act(cloneKeys, {}) },
+  { id: "extract", title: "Достать из прекомпа", subtitle: "Слои обратно в композицию", group: "Слои", controls: [],
+    hint: () => "Выделите прекомп: слои встанут на те же места, прекомп выключится", build: () => act(extract, {}) },
+  { id: "toShapes", title: "В шейпы", subtitle: "Текст или Illustrator → шейп-слои", group: "Слои", controls: [],
+    hint: () => "Выделите текстовый слой или слой .ai", build: () => act(toShapes, {}) },
   { id: "reverse", title: "Развернуть ключи", subtitle: "Анимация задом наперёд", group: "Ключи", controls: [],
     hint: () => "Выделенные ключи (минимум 2), иначе все ключи выделенных свойств", build: () => act(reverseKeys, {}) },
   {
@@ -116,9 +130,9 @@ export const SERVICE_PRESETS: Preset[] = [
   { id: "precomp", title: "Прекомпоз", subtitle: "Собрать выделенные слои в композицию", group: "Слои", controls: [], build: () => act(precompose, { name: "Прекомпоз" }) },
   {
     id: "seq", title: "По очереди", subtitle: "Сдвинуть слои лесенкой", group: "Время",
-    controls: [slider("step", "Шаг", 5, 0, 120, 1, "кадр."), { type: "toggle", key: "reverse", label: "Снизу вверх", value: false }],
+    controls: [slider("step", "Шаг", 5, 0, 120, 1, "кадр."), slider("offset", "Отступ", 0, -300, 300, 1, "кадр."), slider("group", "Группами по", 1, 1, 20, 1, "сл."), { type: "toggle", key: "reverse", label: "Снизу вверх", value: false }],
     hint: (_v, sel) => sel.selected > 1 ? `${layersWord(sel.selected)} по порядку в таймлайне` : "Выделите минимум два слоя",
-    build: (v) => act(sequence, { mode: "time", stepFrames: v.step, reverse: v.reverse }),
+    build: (v) => act(sequence, { mode: "time", stepFrames: v.step, reverse: v.reverse, offsetFrames: v.offset, groupSize: v.group }),
   },
   { id: "markers", title: "По маркерам", subtitle: "Каждый слой — на свой маркер композиции", group: "Время", controls: [{ type: "toggle", key: "reverse", label: "Снизу вверх", value: false }],
     build: (v) => act(sequence, { mode: "markers", reverse: v.reverse }) },
