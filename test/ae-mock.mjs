@@ -61,10 +61,12 @@ export class Group {
   get numProperties() { return this.children.length; }
   property(n) { return typeof n === "number" ? this.children[n - 1] ?? null : this.children.find((c) => c.matchName === n || c.name === n) ?? null; }
   canAddProperty(m) { return m in this.addable; }
+  get propertyIndex() { return this.parentGroup ? this.parentGroup.children.indexOf(this) + 1 : 1; }
+  moveTo(i) { const p = this.parentGroup; p.children.splice(p.children.indexOf(this), 1); p.children.splice(i - 1, 0, this); }
   addProperty(m) {
     if (!(m in this.addable)) throw new Error("cannot add " + m);
     const made = this.addable[m]();
-    made.matchName = m; if (!made.name) made.name = m;
+    made.matchName = m; if (!made.name) made.name = m; made.parentGroup = this;
     this.children.push(made); return made;
   }
 }
@@ -126,6 +128,7 @@ export function makeContext(activeItem) {
         addCamera(name) { return comp.attach(new CameraLayer({ name }), true); },
         addShape() { const l = new ShapeLayer({ name: "Shape" }); l.groups["ADBE Root Vectors Group"] = vectorsGroup("ADBE Root Vectors Group"); return comp.attach(l, true); },
         precompose(idx, name) { comp.precomposed = { idx, name }; return { name }; },
+        addBoxText(size) { const l = makeText("Box", { text: "", fontSize: 36, boxText: true, boxTextSize: size }); return comp.attach(l, true); },
         addText(text) { return comp.attach(makeText("Text", { text, fontSize: 36, applyFill: true, fillColor: [1, 1, 1] }), true); },
         add(source) { const l = new AVLayer({ name: source.name }); l.source = source; return comp.attach(l, true); },
       };
@@ -156,8 +159,8 @@ export function makeContext(activeItem) {
         new Prop("Anchor", [0, 0], PVT.TwoD_SPATIAL, "ADBE Vector Anchor"), new Prop("Position", [0, 0], PVT.TwoD_SPATIAL, "ADBE Vector Position"),
         new Prop("Scale", [100, 100], PVT.TwoD, "ADBE Vector Scale"), new Prop("Rotation", 0, PVT.OneD, "ADBE Vector Rotation"), new Prop("Opacity", 100, PVT.OneD, "ADBE Vector Group Opacity")])]),
       "ADBE Vector Shape - Group": () => new Group("", [new Prop("Path", null, PVT.SHAPE, "ADBE Vector Shape")]),
-      "ADBE Vector Shape - Ellipse": () => new Group("", [new Prop("Size", [100, 100], PVT.TwoD, "ADBE Vector Ellipse Size")]),
-      "ADBE Vector Shape - Rect": () => new Group("", [new Prop("Size", [100, 100], PVT.TwoD, "ADBE Vector Rect Size"), new Prop("Roundness", 0, PVT.OneD, "ADBE Vector Rect Roundness")]),
+      "ADBE Vector Shape - Ellipse": () => new Group("", [new Prop("Size", [100, 100], PVT.TwoD, "ADBE Vector Ellipse Size"), new Prop("Position", [0, 0], PVT.TwoD_SPATIAL, "ADBE Vector Ellipse Position")]),
+      "ADBE Vector Shape - Rect": () => new Group("", [new Prop("Size", [100, 100], PVT.TwoD, "ADBE Vector Rect Size"), new Prop("Roundness", 0, PVT.OneD, "ADBE Vector Rect Roundness"), new Prop("Position", [0, 0], PVT.TwoD_SPATIAL, "ADBE Vector Rect Position")]),
       "ADBE Vector Graphic - Fill": () => new Group("", [new Prop("Color", [1, 1, 1, 1], PVT.COLOR, "ADBE Vector Fill Color"), new Prop("Opacity", 100, PVT.OneD, "ADBE Vector Fill Opacity")]),
       "ADBE Vector Graphic - Stroke": () => new Group("", [new Prop("Color", [1, 1, 1, 1], PVT.COLOR, "ADBE Vector Stroke Color"), new Prop("Stroke Width", 2, PVT.OneD, "ADBE Vector Stroke Width"), new Prop("Line Cap", 1, PVT.NO_VALUE, "ADBE Vector Stroke Line Cap"), new Prop("Opacity", 100, PVT.OneD, "ADBE Vector Stroke Opacity")]),
       "ADBE Vector Filter - Trim": () => new Group("", [new Prop("Start", 0, PVT.OneD, "ADBE Vector Trim Start"), new Prop("End", 100, PVT.OneD, "ADBE Vector Trim End")]),

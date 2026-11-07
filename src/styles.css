@@ -342,3 +342,12 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 15p
 .chip.on { background: var(--accent); color: var(--on-accent); }
 .variant-new { display: inline-flex; gap: 4px; }
 .variant-new input { width: 120px; padding: 3px 8px; border-radius: 999px; border: 0; background: var(--bg); box-shadow: inset 0 0 0 1px var(--accent); font-size: 11.5px; user-select: text; }
+
+/* ---------- превью: биты, субтитры, морфинг ---------- */
+.beat-stage { display: flex; align-items: center; gap: 4px; height: 60%; }
+.beat-stage span { width: 6px; border-radius: 3px; background: var(--accent); animation: beat .48s ease-out infinite; transform-origin: center; }
+@keyframes beat { 0% { transform: scaleY(1); } 30% { transform: scaleY(.35); } 100% { transform: scaleY(1); } }
+.sub-stage { width: 100%; height: 100%; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 18px; background: linear-gradient(180deg, #2d2d40, #1c1c24); }
+.sub-stage span { font-size: 15px; font-weight: 600; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.7); }
+.morph-stage span { display: block; width: 70px; height: 70px; background: var(--accent); animation: morph 2.4s cubic-bezier(.5,0,.5,1) infinite alternate; }
+@keyframes morph { 0%, 15% { border-radius: 10px; transform: rotate(0); } 85%, 100% { border-radius: 50%; transform: rotate(90deg); } }

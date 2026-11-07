@@ -553,3 +553,44 @@ test("счётчик: текстовый слой, выражение на Sourc
   assert.equal(l.property("ADBE Text Properties").property("ADBE Text Document").expression, 'effect("Счётчик1 · от")(1)');
   assert.equal(l.property("ADBE Marker").keys[0].v.duration, 2);
 });
+
+
+// ---------- 0.12: биты, субтитры, морфинг ----------
+test("звук: находит слой со звуком и путь к файлу; маркеры битов с заменой старых", () => {
+  const h = makeContext([]);
+  const a = h.comp.attach(new h.Layer({ name: "music.mp3" })); a.hasAudio = true; a.hasVideo = false; a.source = { file: { fsName: "C:/music.mp3" } }; a.stretch = 100; a.startTime = 2;
+  const info = h.run("ae.audioInfo", {});
+  assert.equal(info.path, "C:/music.mp3"); assert.equal(info.startTime, 2);
+  const mp = h.comp.markerProperty;
+  mp.setValueAtTime(0.1, new h.ctx.MarkerValue("Мой маркер"));
+  h.run("ae.addMarkers", { times: [2.5, 3, 3.5], comment: "Бит", target: "comp", replace: true });
+  h.run("ae.addMarkers", { times: [4, 4.5], comment: "Бит", target: "comp", replace: true });
+  assert.deepEqual(mp.keys.map((k) => [k.t, k.v.comment]), [[0.1, "Мой маркер"], [4, "Бит 1"], [4.5, "Бит 2"]], "свои маркеры не трогаем, прошлые биты заменены");
+});
+
+test("субтитры: слой на фразу со своим временем, внизу кадра, стиль из «Копировать стиль»", () => {
+  const h = makeContext([]);
+  const r = h.run("ae.subtitles", { segments: [{ start: 1, end: 2.5, text: "Привет" }, { start: 2.5, end: 4, text: "мир" }], position: "bottom", style: { font: "Inter-Bold", fontSize: 70 } });
+  assert.equal(r.changed, 2);
+  const [first, second] = [h.comp.layer(1), h.comp.layer(2)];
+  assert.equal(first.name, "Привет"); assert.equal(first.inPoint, 1); assert.equal(first.outPoint, 2.5);
+  assert.equal(second.inPoint, 2.5);
+  const doc = first.property("ADBE Text Properties").property("ADBE Text Document").value;
+  assert.equal(doc.font, "Inter-Bold"); assert.equal(doc.fontSize, 70);
+  assert.equal(first.property("ADBE Transform Group").property("ADBE Position").value[1], 1080 * 0.82);
+});
+
+test("морфинг: прямоугольник перетекает в эллипс — путь с двумя ключами, вторая фигура выключена", () => {
+  const h = makeContext([]);
+  h.run("ae.element", { kind: "frame" }); h.run("ae.element", { kind: "circle" });
+  const [circle, frame] = [h.comp.layer(1), h.comp.layer(2)];
+  // порядок выделения в AE = порядок в selectedLayers: «из» — рамка, «в» — круг
+  h.comp.list = [frame, circle, ...h.comp.list.slice(2)];
+  const r = h.run("ae.morph", { duration: 1 });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  const c = frame.property("ADBE Root Vectors Group").property(1).property("ADBE Vectors Group");
+  const path = c.children.find((x) => x.matchName === "ADBE Vector Shape - Group").property("ADBE Vector Shape");
+  assert.equal(path.keys.length, 2); assert.equal(path.keys[0].v.vertices.length, 8); assert.equal(path.keys[1].v.vertices.length, 4);
+  assert.equal(c.children.find((x) => x.matchName === "ADBE Vector Shape - Rect").enabled, false);
+  assert.equal(circle.enabled, false);
+});

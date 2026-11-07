@@ -17,7 +17,7 @@ const SUB: Record<string, string> = {
   bounce: "Мяч: отскоки от ключа", elastic: "Быстрые отскоки назад", lookAt: "Поворот к другому слою",
   spin: "Постоянное вращение", pulse: "Ритмичный масштаб", sine: "Плавная волна", float: "Парение вверх-вниз",
   flicker: "Случайное мигание", autoFade: "Проявление и затухание на краях слоя",
-  throw: "Бросок с плавным торможением", breathe: "Медленное дыхание масштабом",
+  throw: "Бросок с плавным торможением", breathe: "Медленное дыхание масштабом", beatPulse: "Толчок на каждом маркере",
 };
 const GROUP: Record<string, string> = { inertia: "После ключа", bounce: "После ключа", elastic: "После ключа", loopCycle: "Повтор", loopPingpong: "Повтор", loopOffset: "Повтор" };
 
@@ -42,6 +42,7 @@ function sim(id: string, v: Values, t: number): Pose {
     case "lookAt": return { r: Math.atan2(Math.sin(t * 2), Math.cos(t * 2)) * 57.3 + v.offset };
     case "spin": return { r: t * v.speed };
     case "pulse": return { s: 1 + (v.amp / 100) * Math.sin(t * v.freq * 2 * Math.PI) };
+    case "beatPulse": { const t2 = t % 0.5; return { s: 1 + (v.amp / 100) * Math.exp(-v.decay * t2) }; }
     case "throw": { const k = Math.max(v.drag, 0.001), q = ((1 - Math.exp(-k * t)) / k) * 0.12; return { x: -80 + v.vx * q, y: v.vy * q }; }
     case "breathe": return { s: 1 + (v.amp / 100) * 2 * (0.5 - 0.5 * Math.cos((t * 2 * Math.PI) / Math.max(v.period, 0.01))) };
     case "sine": return { y: v.amp * k * Math.sin(t * v.freq * 2 * Math.PI) };

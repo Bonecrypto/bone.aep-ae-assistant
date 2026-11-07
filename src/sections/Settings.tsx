@@ -7,6 +7,7 @@ import { setPrefs, setStatus, usePrefs } from "../lib/store";
 import { canSelfUpdate, fetchReleases, installRelease, isCurrent, isNewer, type Release } from "../lib/update";
 import { Btn, Row, Seg } from "../ui/ui";
 import { clearLog, getLog, report } from "../lib/errorlog";
+import { STT, type SttProvider } from "../lib/stt";
 import { copyText } from "../lib/clipboard";
 import { callHost } from "../lib/cep";
 
@@ -98,6 +99,19 @@ export function SettingsSection() {
         </Row>
         {testing && <div className="panel-hint">{testing}</div>}
         <div className="panel-hint small">Ключ хранится только в этой панели на вашем компьютере. Сейчас: {chatConfig().baseUrl || "адрес не задан"}</div>
+      </div>
+
+      <div className="panel">
+        <div className="panel-title">Субтитры — распознавание речи</div>
+        <Seg value={p.sttProvider} onChange={(v: SttProvider) => setPrefs({ sttProvider: v, sttModel: "", sttBaseUrl: "" })}
+          options={(Object.keys(STT) as SttProvider[]).map((id) => ({ value: id, label: STT[id].title, hint: STT[id].hint }))} />
+        <div className="panel-hint">{STT[p.sttProvider].hint}</div>
+        {p.sttProvider === "custom" && (
+          <label className="field"><span>Адрес</span><input value={p.sttBaseUrl} placeholder="https://…/v1" onChange={(e) => setPrefs({ sttBaseUrl: e.target.value.trim() })} /></label>
+        )}
+        <label className="field"><span>Модель</span><input value={p.sttModel} placeholder={STT[p.sttProvider].model} onChange={(e) => setPrefs({ sttModel: e.target.value.trim() })} /></label>
+        <label className="field"><span>Ключ</span><input type="password" value={p.sttKey} placeholder="API-ключ" autoComplete="off" onChange={(e) => setPrefs({ sttKey: e.target.value.trim() })} /></label>
+        {STT[p.sttProvider].keyUrl && <button className="link" onClick={() => openUrl(STT[p.sttProvider].keyUrl!)}>Где взять ключ?</button>}
       </div>
 
       <ErrorLog />

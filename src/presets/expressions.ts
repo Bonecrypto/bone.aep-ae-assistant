@@ -154,6 +154,12 @@ export const EXPR_PRESETS: ExprPreset[] = [
     code: (n) => `mul(value, 1 + ${fx(n("amp"))} / 100 * (0.5 - 0.5 * Math.cos(time * 2 * Math.PI / Math.max(${fx(n("period"))}, 0.01))))`,
   },
   {
+    id: "beatPulse", title: "Пульс под бит", hint: "Толчок масштабом на каждом маркере композиции (например, после «Маркеры на биты»)",
+    params: [{ key: "amp", label: "Сила", value: 8, min: 0, max: 100, step: 0.5 }, { key: "decay", label: "Затухание", value: 8, min: 0.5, max: 40, step: 0.5 }],
+    defaultPath: SCALE, forceDefault: true, controlName: ctl("Бит"),
+    code: (n) => `var m = thisComp.marker, k = 0;\nif (m.numKeys > 0) { k = m.nearestKey(time).index; if (m.key(k).time > time) k--; }\nif (k < 1) { value; } else {\n  var t = time - m.key(k).time;\n  mul(value, 1 + ${fx(n("amp"))} / 100 * Math.exp(-${fx(n("decay"))} * t));\n}`,
+  },
+  {
     id: "sine", title: "Волна", hint: "Плавное колебание по синусоиде (по вертикали)",
     params: [{ key: "amp", label: "Размах", value: 40, min: 0, max: 500, step: 1 }, { key: "freq", label: "Частота", value: 0.5, min: 0.05, max: 10, step: 0.05 }],
     defaultPath: POS, controlName: ctl("Волна"),

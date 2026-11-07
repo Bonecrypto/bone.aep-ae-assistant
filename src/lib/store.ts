@@ -32,6 +32,10 @@ export type Prefs = {
   dock: boolean;
   animControl: "marker" | "keys";
   variants: Record<string, { name: string; values: Record<string, any> }[]>;
+  sttProvider: "groq" | "openai" | "custom";
+  sttKey: string;
+  sttBaseUrl: string;
+  sttModel: string;
 };
 
 const defaults: Prefs = {
@@ -63,6 +67,10 @@ const defaults: Prefs = {
   dock: true,
   animControl: "marker",
   variants: {},
+  sttProvider: "groq",
+  sttKey: "",
+  sttBaseUrl: "",
+  sttModel: "",
 };
 
 const KEY = "aea.prefs.v1";

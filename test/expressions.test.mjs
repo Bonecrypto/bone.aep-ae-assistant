@@ -25,7 +25,7 @@ function evaluate(code, prop, keys, time, sliders) {
     value: prop.valueAt(time), time, numKeys: keys.length,
     key: (i) => ({ time: keys[i - 1].t, value: keys[i - 1].v, index: i }),
     nearestKey: (t) => { let best = 0; keys.forEach((k, i) => { if (Math.abs(k.t - t) < Math.abs(keys[best].t - t)) best = i; }); return { index: best + 1, time: keys[best].t }; },
-    velocityAtTime: prop.velocityAt, thisComp: { frameDuration: 1 / 25 },
+    velocityAtTime: prop.velocityAt, thisComp: { frameDuration: 1 / 25, marker: { numKeys: 0 } },
     effect: (name) => () => { if (!(name in sliders)) throw new Error("нет эффекта " + name); return sliders[name]; },
     length: (v) => Math.hypot(...v), clamp: (v, a, b) => Math.min(b, Math.max(a, v)),
     add: op((a, b) => a + b), sub: op((a, b) => a - b), mul: op((a, b) => a * b),
