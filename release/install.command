@@ -1,5 +1,6 @@
 #!/bin/bash
-# AE Assistant — установка на macOS. Двойной клик (первый раз: правый клик → «Открыть»).
+# AE Assistant — установка на macOS.
+# Запуск: в Терминале `bash ` + перетащить этот файл + Enter (macOS 15+ не открывает неподписанные файлы двойным кликом).
 set -e
 ID="com.aeassistant.panel"
 HERE="$(cd "$(dirname "$0")" && pwd)"

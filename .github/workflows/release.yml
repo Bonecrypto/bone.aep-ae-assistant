@@ -44,7 +44,7 @@ jobs:
             echo
             echo "**Windows:** скачай \`AE-Assistant-${VERSION}-win.zip\`, распакуй, закрой After Effects и запусти \`install.cmd\`."
             echo
-            echo "**macOS:** скачай \`AE-Assistant-${VERSION}-mac.zip\`, распакуй, закрой After Effects, правый клик по \`install.command\` → «Открыть»."
+            echo "**macOS:** скачай \`AE-Assistant-${VERSION}-mac.zip\`, распакуй, закрой After Effects, в Терминале: \`bash \` + перетащи \`install.command\` + Enter."
             echo "Уже установлена панель — обнови её в настройках (шестерёнка → Обновления)."
           } > notes.md
           gh release create "$TAG" "$WIN" "$MAC" --title "AE Assistant ${VERSION} (сборка ${GITHUB_RUN_NUMBER})" --notes-file notes.md --latest
