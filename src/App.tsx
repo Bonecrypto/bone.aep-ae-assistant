@@ -6,6 +6,7 @@ import { startSelectionPolling, useSelection } from "./lib/selection";
 import { setPrefs, setStatus, usePrefs, useStatus } from "./lib/store";
 import { fetchReleases, isNewer, type Release } from "./lib/update";
 import { hexToRgb, plural } from "./lib/format";
+import { MOD } from "./lib/platform";
 import { TABS_PRESETS } from "./presets/all";
 import { ChatSection } from "./sections/Chat";
 import { EaseSection } from "./sections/Ease";
@@ -97,7 +98,7 @@ export function App() {
         </nav>
         <div className="top-right">
           {update && <button className="update-dot" title={`Доступно обновление ${update.version}`} onClick={() => goTo("settings")} />}
-          <button className="round" title="Поиск действий (Ctrl+K)" onClick={() => setPalette(true)}><IconSearch /></button>
+          <button className="round" title={`Поиск действий (${MOD}K)`} onClick={() => setPalette(true)}><IconSearch /></button>
           <button className={`round${tab === "settings" ? " on" : ""}`} title="Настройки и обновления" onClick={() => goTo("settings")}><IconGear /></button>
         </div>
       </header>

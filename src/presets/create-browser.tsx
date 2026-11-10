@@ -7,6 +7,7 @@ import { cloneKeys, extract, mergeShapes, quickEase, toShapes } from "../tools/a
 import { ELEMENT_ITEMS, EFFECT_ITEMS, LAYER_ITEMS } from "./create";
 import { layersWord } from "../lib/format";
 import { act, slider, type Preset } from "./types";
+import { undoKeys } from "../lib/platform";
 
 const draw: Record<string, string> = {
   underline: "M60 70 H140", arrow: "M60 50 H136 M120 36 L136 50 L120 64", circle: "M100 22 a28 28 0 1 1 -0.1 0",
@@ -143,6 +144,6 @@ export const SERVICE_PRESETS: Preset[] = [
   { id: "labels", title: "Цвет по типу", subtitle: "Покрасить метки слоёв", group: "Порядок", controls: [],
     hint: () => "Текст — красный, шейпы — жёлтый, прекомпы — голубой, null — розовый, коррекция — лавандовый", build: () => act(labelByType, {}) },
   { id: "clean", title: "Очистить проект", subtitle: "Убрать неиспользуемые исходники", group: "Порядок", controls: [{ type: "toggle", key: "sure", label: "Да, убрать из проекта", value: false }],
-    hint: () => "Файлы на диске не удаляются. Можно отменить Ctrl+Z", applyLabel: "Очистить",
+    hint: () => `Файлы на диске не удаляются. Можно отменить ${undoKeys}`, applyLabel: "Очистить",
     build: (v) => (v.sure ? act(removeUnused, {}) : act({ ...removeUnused, run: async () => ({ ok: false, undoable: false, message: "Включите «Да, убрать из проекта» и нажмите ещё раз." }) }, {})) },
 ];

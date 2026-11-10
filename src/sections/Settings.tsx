@@ -7,6 +7,7 @@ import { setPrefs, setStatus, usePrefs } from "../lib/store";
 import { canSelfUpdate, fetchReleases, installRelease, isCurrent, isNewer, type Release } from "../lib/update";
 import { Btn, Row, Seg } from "../ui/ui";
 import { clearLog, getLog, report } from "../lib/errorlog";
+import { isMac } from "../lib/platform";
 import { STT, type SttProvider } from "../lib/stt";
 import { copyText } from "../lib/clipboard";
 import { callHost } from "../lib/cep";
@@ -43,7 +44,7 @@ export function SettingsSection() {
   };
 
   const install = async (r: Release) => {
-    if (!canSelfUpdate() || !r.zipUrl) { openUrl(r.zipUrl ?? r.pageUrl); setUpdMsg("Скачайте архив, закройте AE и запустите install.cmd."); return; }
+    if (!canSelfUpdate() || !r.zipUrl) { openUrl(r.zipUrl ?? r.pageUrl); setUpdMsg(`Скачайте архив, закройте AE и запустите ${isMac ? "install.command" : "install.cmd"}.`); return; }
     try {
       await installRelease(r, (s) => { setUpdMsg(s); setStatus({ kind: "busy", text: s }); });
     } catch (e) {

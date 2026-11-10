@@ -11,6 +11,7 @@ import { defaults, type Preset } from "../presets/types";
 import { ease } from "../tools/ae/ease";
 import { libImport } from "../tools/ae/library";
 import { applyPreset } from "./Browser";
+import { MOD } from "../lib/platform";
 import { IconBraces, IconCurve, IconFolder, IconLayers, IconPlus, IconSparkles, IconStar, IconText, IconWave, IconWrench } from "./icons";
 
 // Панель быстрого доступа слева: избранное (звёздочки) сверху, частые ниже. Клик — применить сразу.
@@ -104,7 +105,7 @@ export function Dock() {
     <button key={e.key} className="dock-btn" disabled={busy} onClick={e.run}
       draggable={isPinned} onDragStart={() => { drag.current = e.key; }} onDragOver={(ev) => isPinned && ev.preventDefault()} onDrop={() => isPinned && drop(e.key)}
       onContextMenu={(ev) => { ev.preventDefault(); isPinned ? unpin(e.key) : pin(e.key); }}
-      title={`${e.title} — ${e.group}${n <= 9 ? `  (Ctrl+${n})` : ""}\nКлик — применить с последними настройками\nПравый клик — ${isPinned ? "убрать из избранного" : "закрепить"}${isPinned ? "\nПеретащите, чтобы поменять порядок" : ""}`}>
+      title={`${e.title} — ${e.group}${n <= 9 ? `  (${MOD}${n})` : ""}\nКлик — применить с последними настройками\nПравый клик — ${isPinned ? "убрать из избранного" : "закрепить"}${isPinned ? "\nПеретащите, чтобы поменять порядок" : ""}`}>
       {e.glyph}
     </button>
   );

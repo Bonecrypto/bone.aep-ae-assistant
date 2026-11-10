@@ -9,7 +9,7 @@
 В After Effects (26.x, осень 2026) UXP даёт только скриптовые API в превью, системы панелей нет.
 Поэтому панель — CEP (React + TypeScript + Vite), действия — ExtendScript (`host/src/*.jsx`).
 
-## Разработка (Windows)
+## Разработка (Windows и macOS)
 Нужны Node.js 20+ и After Effects 2022 (22.0) или новее.
 
 ```bash
@@ -29,7 +29,7 @@ npm run install:dev
 | `npm run dev` | панель в браузере (без AE, ответы AE имитируются) |
 | `npm test` | host-скрипт на имитации объектов AE |
 | `npm run build` | типы + проверка host (ES3, ASCII) + сборка в `dist/com.aeassistant.panel` |
-| `npm run package` | архив для релиза `dist/release/AE-Assistant-<версия>-win.zip` |
+| `npm run package` | архивы для релиза: `dist/release/AE-Assistant-<версия>-win.zip` и `-mac.zip` |
 | `npm run install:dev` | установка сборки в папку расширений CEP |
 
 ## Релизы и обновления

@@ -35,13 +35,16 @@ jobs:
         run: |
           VERSION=$(node -p "require('./package.json').version")
           TAG="v${VERSION}-b${GITHUB_RUN_NUMBER}"
-          ZIP="dist/release/AE-Assistant-${VERSION}-win.zip"
+          WIN="dist/release/AE-Assistant-${VERSION}-win.zip"
+          MAC="dist/release/AE-Assistant-${VERSION}-mac.zip"
           {
             echo "## AE Assistant ${VERSION} · сборка ${GITHUB_RUN_NUMBER}"
             echo
             git log -1 --pretty=%B
             echo
-            echo "**Установка:** скачай \`AE-Assistant-${VERSION}-win.zip\`, распакуй, закрой After Effects и запусти \`install.cmd\`."
+            echo "**Windows:** скачай \`AE-Assistant-${VERSION}-win.zip\`, распакуй, закрой After Effects и запусти \`install.cmd\`."
+            echo
+            echo "**macOS:** скачай \`AE-Assistant-${VERSION}-mac.zip\`, распакуй, закрой After Effects, правый клик по \`install.command\` → «Открыть»."
             echo "Уже установлена панель — обнови её в настройках (шестерёнка → Обновления)."
           } > notes.md
-          gh release create "$TAG" "$ZIP" --title "AE Assistant ${VERSION} (сборка ${GITHUB_RUN_NUMBER})" --notes-file notes.md --latest
+          gh release create "$TAG" "$WIN" "$MAC" --title "AE Assistant ${VERSION} (сборка ${GITHUB_RUN_NUMBER})" --notes-file notes.md --latest

@@ -1,6 +1,7 @@
 import { callHost, type HostResult } from "../lib/cep";
 import { humanError } from "./errors";
 import { logError } from "../lib/errorlog";
+import { undoKeys } from "../lib/platform";
 import type { InputSchema, Tool } from "./types";
 
 type OkResult = Extract<HostResult, { ok: true }>;
@@ -41,4 +42,4 @@ export function hostTool<I extends Record<string, any>>(def: {
   };
 }
 
-export const undoHint = " Ctrl+Z — отменить";
+export const undoHint = ` ${undoKeys} — отменить`;

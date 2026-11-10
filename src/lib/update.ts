@@ -1,5 +1,6 @@
 import { BUILD, REPO, VERSION } from "../config";
 import { callHost } from "./cep";
+import { isMac } from "./platform";
 
 // Обновления через GitHub Releases. Тег релиза: v<версия>-b<номер сборки>, архив: AE-Assistant-<версия>-win.zip.
 export type Release = { tag: string; version: string; build: number; date: string; zipUrl: string | null; pageUrl: string; notes: string };
@@ -27,7 +28,8 @@ export async function fetchReleases(): Promise<Release[]> {
   const list = (await res.json()) as any[];
   return list.filter((r) => !r.draft).map((r) => {
     const { version, build } = parseTag(r.tag_name);
-    const zip = (r.assets as any[]).find((a) => /-win\.zip$/i.test(a.name));
+    // архив под свою систему (старые релизы были только для Windows)
+    const zip = (r.assets as any[]).find((a) => (isMac ? /-mac\.zip$/i : /-win\.zip$/i).test(a.name));
     return { tag: r.tag_name, version, build, date: String(r.published_at ?? "").slice(0, 10), zipUrl: zip?.browser_download_url ?? null, pageUrl: r.html_url, notes: String(r.body ?? "") };
   });
 }
