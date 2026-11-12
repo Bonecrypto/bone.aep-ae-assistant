@@ -3,8 +3,7 @@
    * Инструменты в духе Motion Tools:
    *   ae.quickEase   — influence входа/выхода прямо на выделенные ключи (можно на одиночный ключ)
    *   ae.cloneKeys   — копия выделенных ключей в текущее время (с теми же интервалами и ease)
-   *   ae.extract     — достать слои из выделенного прекомпа обратно в композицию, на тех же местах
-   *   ae.toShapes    — текст / Illustrator-слой -> шейпы (команда меню AE)
+     *   ae.toShapes    — текст / Illustrator-слой -> шейпы (команда меню AE)
    */
   tools["ae.quickEase"] = function (args) {
     var comp = activeComp();
@@ -64,40 +63,6 @@
       }
     });
     return { ok: true, changed: keys };
-  };
-
-  tools["ae.extract"] = function (args) {
-    var comp = activeComp();
-    if (!comp) return fail("NO_COMP");
-    var sel = selectedLayers(comp), pre = null, i;
-    for (i = 0; i < sel.length; i++) if (sel[i].source instanceof CompItem) { pre = sel[i]; break; }
-    if (!pre) return fail("NO_PRECOMP");
-    var inner = pre.source, made = 0;
-    undoable(args.undoName, function () {
-      // null повторяет трансформацию прекомпа: слои сохраняют вид в кадре
-      var tr = pre.property("ADBE Transform Group"), holder = comp.layers.addNull(comp.duration);
-      holder.name = pre.name;
-      var copyT = ["ADBE Anchor Point", "ADBE Position", "ADBE Scale", "ADBE Rotate Z", "ADBE Opacity"];
-      for (var c = 0; c < copyT.length; c++) {
-        var from = tr.property(copyT[c]), to = holder.property("ADBE Transform Group").property(copyT[c]);
-        if (from && to && !from.numKeys) { try { to.setValue(from.value); } catch (e) {} }
-      }
-      holder.moveBefore(pre);
-      var copies = [];
-      for (i = inner.numLayers; i >= 1; i--) {
-        inner.layer(i).copyToComp(comp);
-        var nl = comp.layer(1);
-        nl.startTime = nl.startTime + pre.startTime;
-        copies.push(nl);
-      }
-      for (i = copies.length - 1; i >= 0; i--) {
-        copies[i].moveBefore(holder);
-        if (!copies[i].parent) copies[i].parent = holder; // без «прыжка»: координаты прекомпа = пространство null
-        made++;
-      }
-      pre.enabled = false;
-    });
-    return { ok: true, changed: made, from: pre.name };
   };
 
   tools["ae.toShapes"] = function (args) {

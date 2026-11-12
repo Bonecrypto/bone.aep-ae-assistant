@@ -25,8 +25,8 @@
         if (src.locked) continue;
         var pieces = splitPieces(sourceTextProp(src).valueAtTime(comp.time, false).text, args.unit);
         if (pieces.length > 300) { tooMany++; continue; }
-        // с конца, чтобы порядок слоёв в таймлайне совпал с порядком текста
-        for (var k = pieces.length; k >= 1; k--) {
+        // каждая копия встаёт прямо над исходным: по порядку текста сверху вниз
+        for (var k = 1; k <= pieces.length; k++) {
           var d = src.duplicate();
           d.name = pieces[k - 1];
           var anim = d.property("ADBE Text Properties").property("ADBE Text Animators").addProperty("ADBE Text Animator");

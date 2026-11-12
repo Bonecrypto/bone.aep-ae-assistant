@@ -24,13 +24,34 @@ export const cloneKeys = hostTool<Record<string, never>>({
   done: (r) => `Скопировано: ${keysWord(Number(r.changed))} в текущее время.${undoHint}`,
 });
 
+export const unprecompose = hostTool<{ scope: "selected" | "all"; recursive: boolean; removeLayer: boolean; removeComps: boolean }>({
+  name: "ae.unprecompose",
+  title: () => "Распаковать прекомпы",
+  description:
+    "Распаковывает прекомпы обратно в композицию (например, тексты после импорта из Premiere): scope=selected — выделенные, all — все в активной композиции; " +
+    "recursive — и вложенные. Слои встают на свои места и во времени (с учётом обрезки), трансформация и прозрачность прекомпа сохраняются. " +
+    "removeLayer — удалить слой прекомпа, removeComps — удалить из проекта ставшие ненужными композиции. Прекомпы с Time Remap, другой скоростью или эффектами пропускаются.",
+  inputSchema: { type: "object", properties: {
+    scope: { type: "string", enum: ["selected", "all"], description: "Какие прекомпы." },
+    recursive: { type: "boolean", description: "Распаковывать вложенные." },
+    removeLayer: { type: "boolean", description: "Удалить слой прекомпа (иначе выключить)." },
+    removeComps: { type: "boolean", description: "Удалить ненужные композиции из проекта." } }, required: ["scope"] },
+  mutates: true,
+  toArgs: (i) => ({ ...i, holderName: "Прекомп" }),
+  done: (r) => {
+    const skipped = [Number(r.remap) && `с Time Remap: ${r.remap}`, Number(r.stretch) && `с другой скоростью: ${r.stretch}`, Number(r.effects) && `с эффектами: ${r.effects}`].filter(Boolean);
+    return `Распаковано прекомпов: ${Number(r.precomps) || 0}, слоёв: ${Number(r.layers) || 0}${Number(r.removedComps) ? `, удалено композиций: ${r.removedComps}` : ""}${skipped.length ? ` · пропущено ${skipped.join(", ")}` : ""}.${undoHint}`;
+  },
+});
+
 export const extract = hostTool<Record<string, never>>({
   name: "ae.extract",
   title: () => "Достать из прекомпа",
-  description: "Достаёт слои выделенного прекомпа обратно в композицию на тех же местах и во времени: слои привязываются к null с трансформацией прекомпа, сам прекомп выключается.",
+  description: "Достаёт слои выделенного прекомпа обратно в композицию на тех же местах и во времени, сам прекомп выключается (для полной уборки — ae.unprecompose).",
   inputSchema: { type: "object", properties: {} },
   mutates: true,
-  done: (r) => `Из «${String(r.from)}» достано ${layersWord(Number(r.changed))}; прекомп выключен.${undoHint}`,
+  toArgs: () => ({ holderName: "Прекомп" }),
+  done: (r) => `Достано ${layersWord(Number(r.changed))}; прекомп выключен.${undoHint}`,
 });
 
 export const toShapes = hostTool<Record<string, never>>({

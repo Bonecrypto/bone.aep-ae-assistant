@@ -64,6 +64,7 @@ function mockHost(name: string): Promise<HostResult> {
     "ae.create": { ok: true, layer: "Слой", parented: 0 },
     "ae.element": { ok: true, layer: "Элемент" },
     "ae.precompose": { ok: true, comp: "Прекомпоз", changed: 2 },
+    "ae.unprecompose": { ok: true, precomps: 3, layers: 7, removedComps: 3, remap: 0, stretch: 0, effects: 0 },
   };
   const r = fake[name] ?? { ok: true, changed: 2, skipped: { locked: 0, noPosition: 0, expression: 0 }, mock: true };
   return new Promise((res) => setTimeout(() => res(r), 200));

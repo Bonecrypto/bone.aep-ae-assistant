@@ -90,18 +90,22 @@ function transform(pos) {
 
 export class Layer {
   constructor({ name = "Слой", pos = [960, 540], locked = false, rect = { left: -100, top: -50, width: 200, height: 100 } } = {}) {
-    Object.assign(this, { enabled: true, name, locked, rect, parent: null, threeDLayer: false, selected: true, label: 0, startTime: 0, inPoint: 0, outPoint: 10, nullLayer: false, adjustmentLayer: false, hasVideo: true, hasAudio: false, source: null });
+    Object.assign(this, { timeRemapEnabled: false, stretch: 100, blendingMode: 1, enabled: true, name, locked, rect, parent: null, threeDLayer: false, selected: true, label: 0, startTime: 0, inPoint: 0, outPoint: 10, nullLayer: false, adjustmentLayer: false, hasVideo: true, hasAudio: false, source: null });
     this.groups = { "ADBE Marker": Object.assign(new Prop("Marker", null, PVT.NO_VALUE, "ADBE Marker"), { canSetExpression: false }), "ADBE Transform Group": transform(pos), "ADBE Effect Parade": new Group("ADBE Effect Parade", [], { addable: Object.fromEntries(EFFECTS.map((m) => [m, effectFactory(m)])) }) };
     this.selectedProperties = [];
   }
   property(n) { return this.groups[n] ?? null; }
   sourceRectAtTime() { return this.rect; }
   setParentWithJump(p) { this.parent = p; }
-  moveBefore(other) { this.movedBefore = other; }
+  moveBefore(other) { this.movedBefore = other; if (this.comp && other && this.comp.list.includes(other)) { const L = this.comp.list; L.splice(L.indexOf(this), 1); L.splice(L.indexOf(other), 0, this); } }
   moveAfter(other) { if (this.comp) { const L = this.comp.list; L.splice(L.indexOf(this), 1); L.splice(L.indexOf(other) + 1, 0, this); } }
   moveToBeginning() { this.atTop = true; }
-  copyToComp(comp) { const c = new this.constructor({ name: this.name }); c.startTime = this.startTime; c.inPoint = this.inPoint; c.outPoint = this.outPoint; comp.attach(c, true); return c; }
-  remove() { this.removed = true; }
+  copyToComp(comp) {
+    const c = new this.constructor({ name: this.name });
+    Object.assign(c, { startTime: this.startTime, inPoint: this.inPoint, outPoint: this.outPoint, source: this.source, nullLayer: this.nullLayer });
+    comp.attach(c, true); return c;
+  }
+  remove() { this.removed = true; if (this.comp) this.comp.list = this.comp.list.filter((l) => l !== this); }
   applyPreset(file) { this.comp.appliedPreset = file.fsName; }
   get index() { return this.comp ? this.comp.list.indexOf(this) + 1 : 1; }
 }
@@ -133,6 +137,8 @@ export function makeContext(activeItem) {
         add(source) { const l = new AVLayer({ name: source.name }); l.source = source; return comp.attach(l, true); },
       };
     }
+    get usedIn() { return this._usedIn ?? [...registry.values()].filter((c) => c.list && c.list.some((l) => l.source === this && !l.removed)); }
+    set usedIn(v) { this._usedIn = v; }
     saveFrameToPng(t, f) { ctx.savedFrames = [...(ctx.savedFrames ?? []), { t, file: f.fsName }]; }
     remove() { this.removed = true; registry.delete(this.id); }
     attach(l, top = false) { l.comp = this; if (top) this.list.unshift(l); else this.list.push(l); return l; }
@@ -183,7 +189,7 @@ export function makeContext(activeItem) {
 
   const ctx = {
     CompItem, AVLayer, TextLayer, ShapeLayer, CameraLayer, LightLayer, SolidSource, KeyframeEase, Shape, MarkerValue,
-    FolderItem, FootageItem, File, Folder, ImportOptions, ImportAsType: { PROJECT: 1, FOOTAGE: 2 }, ParagraphJustification: { CENTER_JUSTIFY: 7413 },
+    FolderItem, FootageItem, File, Folder, ImportOptions, ImportAsType: { PROJECT: 1, FOOTAGE: 2 }, ParagraphJustification: { CENTER_JUSTIFY: 7413 }, BlendingMode: { NORMAL: 1, ADD: 2, SCREEN: 3 },
     PropertyValueType: PVT, PropertyType: PT,
     KeyframeInterpolationType: { LINEAR, BEZIER, HOLD: 6614 },
     app: { version: "26.5x89", project: { activeItem: null, numItems: 3, removeUnusedFootage: () => 2, rootFolder: root,

@@ -486,7 +486,9 @@ test("достать из прекомпа: слои в композиции, с
   const r = h.run("ae.extract", {});
   assert.equal(r.changed, 2); assert.equal(pre.enabled, false);
   const names = h.comp.list.map((l) => l.name);
-  assert.deepEqual(names.slice(0, 3), ["Лого", "Фон", "Пре"], "порядок как в прекомпе, null с именем прекомпа");
+  assert.deepEqual(names.slice(0, 2), ["Лого", "Фон"], "порядок как в прекомпе");
+  assert.match(names[2], /Пре$/, "null с именем прекомпа");
+  assert.equal(names[3], "Пре", "прекомп остался (выключен)");
   assert.equal(h.comp.layer(1).startTime, 2); assert.equal(h.comp.layer(1).parent.nullLayer, true);
   assert.equal(makeContext([]).run("ae.extract", {}).code, "NO_PRECOMP");
 });
@@ -593,4 +595,70 @@ test("морфинг: прямоугольник перетекает в элл�
   assert.equal(path.keys.length, 2); assert.equal(path.keys[0].v.vertices.length, 8); assert.equal(path.keys[1].v.vertices.length, 4);
   assert.equal(c.children.find((x) => x.matchName === "ADBE Vector Shape - Rect").enabled, false);
   assert.equal(circle.enabled, false);
+});
+
+
+// ---------- распаковка прекомпов ----------
+function precompScene() {
+  const h = makeContext([]);
+  const inner = new h.ctx.CompItem([]); inner.name = "Текст из Premiere";
+  const t1 = inner.attach(new h.Layer({ name: "Заголовок" })); t1.selected = false; Object.assign(t1, { startTime: 0, inPoint: 0, outPoint: 3 });
+  const t2 = inner.attach(new h.Layer({ name: "Подпись" })); t2.selected = false; Object.assign(t2, { startTime: 0, inPoint: 3.5, outPoint: 10 });
+  const pre = h.comp.attach(new h.Layer({ name: "Текст из Premiere" }));
+  Object.assign(pre, { source: inner, startTime: 2, inPoint: 2.5, outPoint: 6 });
+  const tr = pre.property("ADBE Transform Group");
+  tr.property("ADBE Anchor Point").value = [960, 540]; // как из Premiere: прекомп во весь кадр, по центру
+  return { h, inner, pre, tr, t1, t2 };
+}
+
+test("распаковка как из Premiere: без лишнего null, время с учётом обрезки, прекомп и композиция удалены", () => {
+  const { h, inner } = precompScene();
+  const r = h.run("ae.unprecompose", { scope: "all", recursive: true, removeLayer: true, removeComps: true, holderName: "Прекомп" });
+  assert.equal(r.ok, true, JSON.stringify(r)); assert.equal(r.precomps, 1); assert.equal(r.layers, 2); assert.equal(r.removedComps, 1);
+  const names = h.comp.list.map((l) => l.name);
+  assert.deepEqual(names, ["Заголовок", "Подпись"], "ни null, ни слоя прекомпа");
+  const [a, b] = h.comp.list;
+  assert.deepEqual([a.startTime, a.inPoint, a.outPoint], [2, 2.5, 5], "обрезано по началу прекомпа");
+  assert.deepEqual([b.inPoint, b.outPoint], [5.5, 6], "обрезано по концу прекомпа");
+  assert.equal(h.ctx.app.project.itemByID(inner.id), null);
+});
+
+test("распаковка: затухание прекомпа переходит выражением, масштаб — через null", () => {
+  const { h, tr } = precompScene();
+  tr.property("ADBE Opacity").setValueAtTime(2.5, 0); tr.property("ADBE Opacity").setValueAtTime(3, 100);
+  tr.property("ADBE Scale").value = [50, 50, 100];
+  const r = h.run("ae.unprecompose", { scope: "all", holderName: "Прекомп" });
+  assert.equal(r.ok, true);
+  const holder = h.comp.list.find((l) => l.nullLayer);
+  assert.ok(holder, "есть null"); assert.match(holder.name, /^Прекомп 1: /);
+  assert.deepEqual(holder.property("ADBE Transform Group").property("ADBE Opacity").keys.map((k) => k.v), [0, 100]);
+  assert.deepEqual(plain(holder.property("ADBE Transform Group").property("ADBE Scale").value), [50, 50, 100]);
+  const title = h.comp.list.find((l) => l.name === "Заголовок");
+  assert.equal(title.parent, holder);
+  assert.match(title.property("ADBE Transform Group").property("ADBE Opacity").expression, /thisComp\.layer\(.*\)\.transform\.opacity/);
+});
+
+test("распаковка: родители внутри прекомпа сохраняются, вложенные прекомпы тоже распаковываются", () => {
+  const { h, inner, t1, t2 } = precompScene();
+  t2.parent = t1;
+  const deep = new h.ctx.CompItem([]); deep.name = "Вложенный";
+  const d1 = deep.attach(new h.Layer({ name: "Глубоко" })); d1.selected = false; Object.assign(d1, { startTime: 0, inPoint: 0, outPoint: 20 });
+  const nested = inner.attach(new h.Layer({ name: "Вложенный" })); nested.selected = false;
+  Object.assign(nested, { source: deep, startTime: 0, inPoint: 0, outPoint: 20 });
+  nested.property("ADBE Transform Group").property("ADBE Anchor Point").value = [960, 540];
+  const r = h.run("ae.unprecompose", { scope: "all", recursive: true });
+  assert.equal(r.precomps, 2);
+  const names = h.comp.list.map((l) => l.name);
+  assert.ok(names.includes("Глубоко") && !names.includes("Вложенный"), names.join(", "));
+  const sub = h.comp.list.find((l) => l.name === "Подпись"), head = h.comp.list.find((l) => l.name === "Заголовок");
+  assert.equal(sub.parent, head);
+});
+
+test("распаковка: Time Remap и эффекты — пропуск с понятной причиной; только выделенные", () => {
+  const { h, pre } = precompScene();
+  pre.timeRemapEnabled = true;
+  const r = h.run("ae.unprecompose", { scope: "all" });
+  assert.equal(r.code, "NOTHING_UNPACKED"); assert.equal(r.skipped.remap, 1);
+  pre.timeRemapEnabled = false; pre.selected = false;
+  assert.equal(h.run("ae.unprecompose", { scope: "selected" }).code, "NO_PRECOMP");
 });

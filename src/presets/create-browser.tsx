@@ -3,7 +3,7 @@ import { precompose, sequence, labelByType, removeUnused } from "../tools/ae/ser
 import { motionBlur } from "../tools/ae/animate";
 import { glass } from "../tools/ae/glass";
 import { align, anchor, distribute, reverseKeys, splitText } from "../tools/ae/layout";
-import { cloneKeys, extract, mergeShapes, quickEase, toShapes } from "../tools/ae/mtools";
+import { cloneKeys, mergeShapes, quickEase, toShapes, unprecompose } from "../tools/ae/mtools";
 import { ELEMENT_ITEMS, EFFECT_ITEMS, LAYER_ITEMS } from "./create";
 import { layersWord } from "../lib/format";
 import { act, slider, type Preset } from "./types";
@@ -116,8 +116,18 @@ export const SERVICE_PRESETS: Preset[] = [
   },
   { id: "clone", title: "Клонировать ключи", subtitle: "Копия выделенных ключей на указатель", group: "Ключи", controls: [],
     hint: (_v, sel) => (sel.keys ? `Ключей: ${sel.keys} → в текущее время` : "Выделите ключи и поставьте указатель"), build: () => act(cloneKeys, {}) },
-  { id: "extract", title: "Достать из прекомпа", subtitle: "Слои обратно в композицию", group: "Слои", controls: [],
-    hint: () => "Выделите прекомп: слои встанут на те же места, прекомп выключится", build: () => act(extract, {}) },
+  {
+    id: "unprecompose", title: "Распаковать прекомпы", subtitle: "Например, тексты после Premiere", group: "Слои",
+    controls: [
+      { type: "seg", key: "scope", label: "Какие", value: "all", options: [{ value: "all", label: "Все в композиции" }, { value: "selected", label: "Выделенные" }] },
+      { type: "toggle", key: "recursive", label: "И вложенные", value: true },
+      { type: "toggle", key: "removeLayer", label: "Удалить слой прекомпа", value: true },
+      { type: "toggle", key: "removeComps", label: "Убрать пустые прекомпы из проекта", value: true },
+    ],
+    hint: () => `Слои встанут на свои места и во времени. ${undoKeys} — и всё вернётся`,
+    applyLabel: "Распаковать",
+    build: (v) => act(unprecompose, { scope: v.scope, recursive: v.recursive, removeLayer: v.removeLayer, removeComps: v.removeComps }),
+  },
   { id: "merge", title: "Слить шейпы", subtitle: "Несколько шейп-слоёв в один", group: "Слои", controls: [],
     hint: () => "Выделите шейп-слои: всё сольётся в верхний, остальные выключатся", build: () => act(mergeShapes, {}) },
   { id: "toShapes", title: "В шейпы", subtitle: "Текст или Illustrator → шейп-слои", group: "Слои", controls: [],
