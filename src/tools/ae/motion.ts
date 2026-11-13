@@ -16,6 +16,7 @@ export type MotionInput = {
   markerName?: string;
   hidden?: string;
   at?: "playhead" | "layer";
+  markerStyle?: "tr" | "bar";
 };
 
 export const motion = hostTool<MotionInput>({

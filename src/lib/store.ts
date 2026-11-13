@@ -30,7 +30,8 @@ export type Prefs = {
   usage: Record<string, { n: number; last: number }>;
   lastValues: Record<string, Record<string, any>>;
   dock: boolean;
-  animControl: "marker" | "keys";
+  animControl: "tr" | "marker" | "keys";
+  trMigrated?: boolean;
   variants: Record<string, { name: string; values: Record<string, any> }[]>;
   sttProvider: "groq" | "openai" | "custom";
   sttKey: string;
@@ -76,7 +77,7 @@ const defaults: Prefs = {
   usage: {},
   lastValues: {},
   dock: true,
-  animControl: "marker",
+  animControl: "tr",
   variants: {},
   sttProvider: "groq",
   sttKey: "",
@@ -108,6 +109,9 @@ function load(): Prefs {
     const raw = localStorage.getItem(KEY);
     const saved = raw ? (JSON.parse(raw) as Partial<Prefs>) : {};
     if (saved.accent === "#7f00ff") saved.accent = defaults.accent; // акцент из 0.5.1 по умолчанию -> обратно фиолетовый из ТЗ
+    // 0.16: «маркер» по умолчанию стал «TR In / TR Out»; осознанный выбор полосы после этого сохраняется
+    if (saved.animControl === "marker" && !saved.trMigrated) saved.animControl = "tr";
+    saved.trMigrated = true;
     return { ...defaults, ...saved };
   } catch {
     return { ...defaults };

@@ -34,10 +34,11 @@
   // Режим маркера: те же «спрятанные» значения, но через выражения, от маркера слоя.
   var foreign = { n: 0 };
   function motionByMarker(layer, tr, comp, t0, duration, args, isIn) {
+    var trStyle = args.markerStyle === "tr";
     var tag = nextTag(layer), name = String(args.markerName || "Anim @@").split("@@").join(tag);
-    var head = "var mk = MK(" + str(name) + ");\nif (!mk) return value;\n" +
-      "var p = Math.min(1, Math.max(0, (time - mk.time) / Math.max(mk.duration, 0.001)));\n" +
-      "var h = " + args.hidden + ";\n";
+    var timing = trStyle ? trTiming(isIn)
+      : "var mk = MK(" + str(name) + ");\nif (!mk) return value;\nvar s = mk.time, d = Math.max(mk.duration, 0.001);\n";
+    var head = timing + "var p = Math.min(1, Math.max(0, (time - s) / d));\n" + "var h = " + args.hidden + ";\n";
     var did = false;
     // свойства со своим (не нашим) выражением пропускаем, чтобы его не затереть
     var add = function (prop, body) { if (!canChain(prop)) { foreign.n++; return; } chainExpression(prop, head + body); did = true; };
@@ -62,7 +63,10 @@
       var bp = blurProp(layer, args.blurName || "Blur");
       if (bp) add(bp, "return value + " + num(args.blurFrom) + " * Math.max(0, h);");
     }
-    if (did) addLayerMarker(layer, t0, duration, name);
+    if (did) {
+      if (trStyle) ensurePointMarker(layer, isIn ? layer.inPoint + duration : layer.outPoint - duration, isIn ? "TR In" : "TR Out");
+      else addLayerMarker(layer, t0, duration, name);
+    }
     return did;
   }
 

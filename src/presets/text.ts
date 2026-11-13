@@ -31,17 +31,20 @@ const ORDER_EXPR: Record<string, string> = {
  */
 const MK = "function MK(n) { var m = thisLayer.marker; for (var k = m.numKeys; k >= 1; k--) { if (m.key(k).comment == n) return m.key(k); } return null; }";
 
-function amountCode(v: Values, markerName: string) {
+function amountCode(v: Values, markerName: string, style: "tr" | "bar" = "bar") {
   const ease = EASE_EXPR[(v.ease as EaseKind) ?? "smooth"];
   return `// AE Assistant — текст по ${v.unit === "words" ? "словам" : v.unit === "lines" ? "строкам" : "буквам"}, время = маркер «${markerName}»
 ${MK}
-var mk = MK(${JSON.stringify(markerName)});
-if (!mk) { [0, 0, 0]; } else {
-  var T = Math.max(mk.duration, 0.001), F = Math.min(1, Math.max(0, effect("Текст@@ · плавность")(1) / 100));
+${style === "tr"
+    ? (v.mode === "out"
+      ? `var mk = MK("TR Out");\nif (!mk) { [0, 0, 0]; } else {\n  var S0 = mk.time, T = Math.max(outPoint - mk.time, 0.001);`
+      : `var mk = MK("TR In");\nif (!mk) { [0, 0, 0]; } else {\n  var S0 = inPoint, T = Math.max(mk.time - inPoint, 0.001);`)
+    : `var mk = MK(${JSON.stringify(markerName)});\nif (!mk) { [0, 0, 0]; } else {\n  var S0 = mk.time, T = Math.max(mk.duration, 0.001);`}
+  var F = Math.min(1, Math.max(0, effect("Текст@@ · плавность")(1) / 100));
   var n = textTotal, i = textIndex - 1;
   ${ORDER_EXPR[v.order] ?? ""}
   var D = Math.max(T * F, 0.001), G = n > 1 ? (T - T * F) / (n - 1) : 0;
-  var p = Math.min(1, Math.max(0, (time - mk.time - i * G) / D));
+  var p = Math.min(1, Math.max(0, (time - S0 - i * G) / D));
   ${v.mode === "out" ? "p = 1 - p;" : ""}
   var a = 100 * (1 - (${ease}));
   [a, a, a];
@@ -61,13 +64,16 @@ function previewIndex(order: string, i: number, n: number) {
   return i;
 }
 
+// стиль маркера для текста: «TR In / TR Out» или полоса (режим «Ключи» для текста тоже маркер — анимация на выражении)
+const textStyle = (): "tr" | "bar" => (getPrefs().animControl === "marker" ? "bar" : "tr");
+
 const markerFor = (title: string, mode: string, tag: string) => `${mode === "out" ? "Исчезание" : "Появление"} · ${title} ${tag}`;
 
 function make(id: string, title: string, subtitle: string, extra: Ctl[], hidden: (v: Values) => Hidden, init: Partial<Record<string, any>> = {}): Preset {
   const controls = [DIR_SEG, AT_SEG, UNIT, EASE, TOTAL, SOFT, ...extra, ORDER].map((c) => (c.key in init ? { ...c, value: init[c.key] } : c)) as Ctl[];
   return {
     id, title, subtitle, group: "Появление и исчезание", controls,
-    code: (v) => amountCode(v, markerFor(title, v.mode, "@@")),
+    code: (v) => amountCode(v, markerFor(title, v.mode, "@@"), textStyle()),
     preview: (v) => {
       const h = hidden(v);
       const text = v.unit === "lines" ? "Анимация\nтекста" : "Анимация текста";
@@ -91,13 +97,14 @@ function make(id: string, title: string, subtitle: string, extra: Ctl[], hidden:
         },
       };
     },
-    hint: (_v, sel) => sel.text ? `${sel.text} ${plural(sel.text, "текстовый слой", "текстовых слоя", "текстовых слоёв")} · длительность — маркер на слое, тяните его конец` : "Выделите текстовый слой",
+    hint: (v, sel) => sel.text ? `${sel.text} ${plural(sel.text, "текстовый слой", "текстовых слоя", "текстовых слоёв")} · ${textStyle() === "tr" ? (v.mode === "out" ? "от «TR Out» до конца слоя" : "от начала слоя до «TR In»") : "длительность — маркер-полоса на слое"}` : "Выделите текстовый слой",
     build: (v) => {
       const name = markerFor(title, v.mode, "@@");
+      const style = textStyle();
       return act(textFx, {
-        title, unit: v.unit, props: hidden(v), code: amountCode(v, name), startSlider: "",
+        title, unit: v.unit, props: hidden(v), code: amountCode(v, name, style), startSlider: "",
         controls: [{ name: "Текст@@ · плавность", value: v.soft }],
-        marker: { name, duration: v.total }, at: v.at, mode: v.mode,
+        marker: { name, duration: v.total, style }, at: v.at, mode: v.mode,
       });
     },
   };

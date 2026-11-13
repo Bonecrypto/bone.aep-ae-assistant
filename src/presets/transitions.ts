@@ -38,12 +38,23 @@ function poseFor(r: ReturnType<Recipe>, v: Values, i: number, t: number): Pose {
 }
 
 /** Режим маркера: насколько слой «спрятан» (h) от прогресса p внутри маркера — та же кривая, что в превью. */
-export function markerArgs(title: string, mode: string, spring: boolean) {
-  if (getPrefs().animControl === "keys") return { control: "keys" as const };
+export function markerArgs(title: string, mode: string, spring: boolean, multi = false) {
+  const style = getPrefs().animControl;
+  if (style === "keys") return { control: "keys" as const };
   const hidden = mode === "out"
     ? `(function (p) { return 1 - ${EASE_EXPR.smooth}; })(1 - p)`
     : `(1 - ${EASE_EXPR[spring ? "back" : "smooth"]})`;
-  return { control: "marker" as const, markerName: `${mode === "out" ? "Исчезание" : "Появление"} · ${title} @@`, hidden };
+  // каскад по слоям — всегда полосой: у каждого слоя свой сдвиг во времени
+  const markerStyle = style === "tr" && !multi ? ("tr" as const) : ("bar" as const);
+  return { control: "marker" as const, markerStyle, markerName: `${mode === "out" ? "Исчезание" : "Появление"} · ${title} @@`, hidden };
+}
+
+/** Подсказка, где искать ручку длительности. */
+export function markerHint(mode: string, multi = false) {
+  const style = getPrefs().animControl;
+  if (style === "keys") return "ключами от текущего времени";
+  if (style === "tr" && !multi) return mode === "out" ? "от маркера «TR Out» до конца слоя — двигайте маркер" : "от начала слоя до маркера «TR In» — двигайте маркер";
+  return "длительность — маркер-полоса на слое, тяните его конец";
 }
 
 function make(id: string, title: string, subtitle: string, group: string, extra: Ctl[], recipe: Recipe, multi = false): Preset {
@@ -55,10 +66,10 @@ function make(id: string, title: string, subtitle: string, group: string, extra:
       const count = multi ? 3 : 1;
       return { kind: "layers", count, label: "Слой", length: v.duration + (count - 1) * (v.stagger ?? 0), pose: (i, t) => poseFor(r, v, i, t) };
     },
-    hint: (_v, sel) => sel.selected
-      ? `${layersWord(sel.selected)} · ${getPrefs().animControl === "marker" ? "длительность — маркер на слое, тяните его конец" : "ключами от текущего времени"}`
+    hint: (v, sel) => sel.selected
+      ? `${layersWord(sel.selected)} · ${markerHint(v.mode, multi)}`
       : "Выделите слои и поставьте указатель времени",
-    build: (v) => act(motion, { ...recipe(v), title, mode: v.mode, duration: v.duration, stagger: multi ? v.stagger : 0, at: v.at, ...markerArgs(title, v.mode, !!recipe(v).spring) }),
+    build: (v) => act(motion, { ...recipe(v), title, mode: v.mode, duration: v.duration, stagger: multi ? v.stagger : 0, at: v.at, ...markerArgs(title, v.mode, !!recipe(v).spring, multi) }),
   };
 }
 

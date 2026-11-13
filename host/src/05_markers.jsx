@@ -21,6 +21,26 @@
     layer.property("ADBE Marker").setValueAtTime(t, mv);
   }
 
+  /*
+   * Стиль Animation Composer: точечные маркеры «TR In» и «TR Out».
+   *   появление — от начала слоя до «TR In», исчезание — от «TR Out» до конца слоя;
+   *   все анимации появления на слое слушают один «TR In» (одна ручка на всё).
+   * Маркер уже есть — не дублируем (его положение — выбор пользователя).
+   */
+  function ensurePointMarker(layer, t, comment) {
+    var mp = layer.property("ADBE Marker");
+    for (var k = 1; k <= mp.numKeys; k++) if (mp.keyValue(k).comment === comment) return false;
+    mp.setValueAtTime(t, new MarkerValue(comment));
+    return true;
+  }
+
+  // Начало анимации (s) и длительность (d) в выражении — по стилю маркера.
+  function trTiming(isIn) {
+    return isIn
+      ? "var mk = MK(\"TR In\");\nif (!mk) return value;\nvar s = inPoint, d = Math.max(mk.time - inPoint, 0.001);\n"
+      : "var mk = MK(\"TR Out\");\nif (!mk) return value;\nvar s = mk.time, d = Math.max(outPoint - mk.time, 0.001);\n";
+  }
+
   // Номер для новой анимации на слое: маркеры слоя + 1 (чтобы имена не совпадали).
   function nextTag(layer) {
     return String(layer.property("ADBE Marker").numKeys + 1);

@@ -8,7 +8,7 @@ export type TextFxArgs = {
   code: string;
   controls: { name: string; value: number }[];
   startSlider: string;
-  marker?: { name: string; duration: number };
+  marker?: { name: string; duration: number; style?: "tr" | "bar" };
   at?: "playhead" | "layer";
   mode?: "in" | "out";
 };

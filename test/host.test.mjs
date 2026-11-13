@@ -364,6 +364,34 @@ test("маркер: переход слоя без ключей, длитель�
   assert.equal(opac(1), 100);
 });
 
+test("TR In / TR Out: точка в конце появления и в начале исчезания, один маркер на все анимации слоя", () => {
+  const { run, l, tr } = one();
+  l.inPoint = 2; l.outPoint = 8;
+  const hidden = "(1 - p)";
+  run("ae.motion", { mode: "in", duration: 0.5, fade: true, control: "marker", markerStyle: "tr", markerName: "П @@", hidden });
+  run("ae.motion", { mode: "in", duration: 0.5, scaleFrom: 0, control: "marker", markerStyle: "tr", markerName: "П @@", hidden });
+  run("ae.motion", { mode: "out", duration: 1, fade: true, control: "marker", markerStyle: "tr", markerName: "И @@", hidden: "p" });
+  const ms = l.property("ADBE Marker").keys;
+  assert.deepEqual(ms.map((k) => [k.t, k.v.comment]), [[2.5, "TR In"], [7, "TR Out"]], "TR In не дублируется");
+  assert.equal(tr.property("ADBE Opacity").keys.length, 0);
+  const opac = (time) => evalExpr(tr.property("ADBE Opacity").expression, { time, value: 100, inPoint: l.inPoint, outPoint: l.outPoint, thisLayer: { marker: markersOf(l) } });
+  assert.equal(opac(2), 0, "в начале слоя спрятан"); assert.ok(opac(2.25) > 0 && opac(2.25) < 100); assert.equal(opac(2.5), 100);
+  assert.equal(opac(5), 100); assert.ok(opac(7.5) > 0 && opac(7.5) < 100); assert.equal(opac(8), 0, "к концу слоя спрятан");
+  ms[0].t = 3; // двигаем TR In — появление длиннее
+  assert.ok(opac(2.5) < 100 && opac(3) === 100);
+  const sc = (time) => evalExpr(tr.property("ADBE Scale").expression, { time, value: [100, 100, 100], inPoint: l.inPoint, outPoint: l.outPoint, thisLayer: { marker: markersOf(l) } });
+  assert.ok(sc(2.5)[0] < 100, "масштаб тоже слушает тот же TR In");
+});
+
+test("TR In для текста: точка на inPoint + длительность", () => {
+  const h = makeContext([]);
+  const t = h.comp.attach(h.makeText("T", { text: "ab" }));
+  t.inPoint = 1;
+  h.run("ae.textFx", { unit: "chars", props: { opacity: 0 }, code: 'MK("TR In")', controls: [], marker: { name: "П @@", duration: 1.5, style: "tr" }, animatorName: "X" });
+  h.run("ae.textFx", { unit: "chars", props: { opacity: 0 }, code: 'MK("TR Out")', controls: [], marker: { name: "И @@", duration: 0.5, style: "tr" }, mode: "out", animatorName: "Y" });
+  assert.deepEqual(t.property("ADBE Marker").keys.map((k) => [k.t, k.v.comment]), [[2.5, "TR In"], [t.outPoint - 0.5, "TR Out"]]);
+});
+
 test("маркер: текст и тряска ставят маркер с длительностью", () => {
   const h = makeContext([]);
   const t = h.comp.attach(h.makeText("T", { text: "ab" }));
