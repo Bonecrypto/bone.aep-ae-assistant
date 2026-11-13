@@ -117,6 +117,7 @@ export const GLYPH: Record<string, G> = {
   clone: S("M8 6l4 4-4 4-4-4z", "M16 10l4 4-4 4-4-4z"),
   reverse: S("M4 8h14l-3-3M20 16H6l3 3"),
   unprecompose: S(rect(7, 7, 10, 10), "M3 3l4 4M21 3l-4 4M3 21l4-4M21 21l-4-4"),
+  dedupeFx: S(rect(3, 3, 11, 11), "M17 8h4v13H8v-4", "M6 6l5 5M11 6l-5 5"),
   merge: S(rect(3, 3, 10, 10), rect(11, 11, 10, 10)),
   toShapes: S("M3 6h8M7 6v12", "M14 18l3.5-6 3.5 6z", "M15 6h6v4h-6z"),
   split: S("M3 7h4M5 7v10M11 7h4M13 7v10M19 7h2M20 7v10"),

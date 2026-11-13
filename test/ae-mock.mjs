@@ -61,6 +61,7 @@ export class Group {
   get numProperties() { return this.children.length; }
   property(n) { return typeof n === "number" ? this.children[n - 1] ?? null : this.children.find((c) => c.matchName === n || c.name === n) ?? null; }
   canAddProperty(m) { return m in this.addable; }
+  remove() { const p = this.parentGroup; p.children.splice(p.children.indexOf(this), 1); }
   get propertyIndex() { return this.parentGroup ? this.parentGroup.children.indexOf(this) + 1 : 1; }
   moveTo(i) { const p = this.parentGroup; p.children.splice(p.children.indexOf(this), 1); p.children.splice(i - 1, 0, this); }
   addProperty(m) {

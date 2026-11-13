@@ -10,7 +10,7 @@ import { applyPreset } from "./preset-tool";
 import { sceneTransition } from "./ae/scene";
 import { glass } from "./ae/glass";
 import { align, anchor, distribute, reverseKeys, splitText } from "./ae/layout";
-import { carousel, cloneKeys, extract, mergeShapes, quickEase, toShapes, unprecompose } from "./ae/mtools";
+import { carousel, cloneKeys, dedupeEffects, extract, mergeShapes, quickEase, toShapes, unprecompose } from "./ae/mtools";
 import { morph } from "./ae/audio";
 import { orderLayers, organize, safeZone } from "./ae/project";
 import { libraryTools } from "./ae/library";
@@ -26,5 +26,5 @@ export const tools: Tool<any>[] = [
   expression, customExpression, clearExpression,
   createLayer, addEffect, element, glass,
   textCopyStyle, textPasteStyle,
-  precompose, sequence, labelByType, removeUnused, anchor, align, distribute, reverseKeys, splitText, quickEase, cloneKeys, extract, unprecompose, toShapes, organize, orderLayers, safeZone, carousel, mergeShapes, morph,
+  precompose, sequence, labelByType, removeUnused, anchor, align, distribute, reverseKeys, splitText, quickEase, cloneKeys, extract, unprecompose, dedupeEffects, toShapes, organize, orderLayers, safeZone, carousel, mergeShapes, morph,
 ];

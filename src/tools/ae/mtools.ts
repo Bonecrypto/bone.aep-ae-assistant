@@ -99,3 +99,18 @@ export const textCounter = hostTool<{ title: string; code: string; controls: { n
     return err ? `${i.title}: ошибка выражения в AE: ${err}` : `${i.title}: текстовый слой в центре, длительность — маркер на слое.${undoHint}`;
   },
 });
+
+export const dedupeEffects = hostTool<{ scope: "selected" | "all"; mode: "copies" | "all" }>({
+  name: "ae.dedupeEffects",
+  title: () => "Убрать дубли эффектов",
+  description:
+    "Удаляет повторы эффектов на слоях: mode=copies — копии вида «Deep Glow 2» при уже стоящем «Deep Glow» того же типа (первый остаётся с настройками), " +
+    "mode=all — все эффекты слоя. scope=selected — выделенные слои, all — все слои активной композиции. Заблокированные слои не трогаются.",
+  inputSchema: { type: "object", properties: {
+    scope: { type: "string", enum: ["selected", "all"], description: "Какие слои." },
+    mode: { type: "string", enum: ["copies", "all"], description: "Только копии или все эффекты." } }, required: ["scope", "mode"] },
+  mutates: true,
+  done: (r) => Number(r.changed)
+    ? `Убрано эффектов: ${r.changed} на ${layersWord(Number(r.layers))}.${Number(r.locked) ? ` Заблокированных пропущено: ${r.locked}.` : ""}${undoHint}`
+    : `Дублей не нашлось.${Number(r.locked) ? ` Заблокированных слоёв пропущено: ${r.locked}.` : ""}`,
+});

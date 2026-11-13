@@ -86,3 +86,36 @@
     undoable(args.undoName, function () { removed = app.project.removeUnusedFootage(); });
     return { ok: true, changed: removed };
   };
+
+  /*
+   * Remove duplicated effects. mode "copies": an effect is a copy when an earlier
+   * effect on the same layer has the same matchName and the same name without the
+   * trailing number ("Deep Glow" / "Deep Glow 2"). mode "all": every effect.
+   * scope "selected" or "all" (all layers of the active comp). Locked layers are skipped.
+   */
+  tools["ae.dedupeEffects"] = function (args) {
+    var comp = activeComp();
+    if (!comp) return fail("NO_COMP");
+    var layers = [];
+    if (args.scope === "selected") layers = selectedLayers(comp);
+    else for (var i = 1; i <= comp.numLayers; i++) layers.push(comp.layer(i));
+    if (!layers.length) return fail("NO_SELECTION");
+    var removed = 0, touched = 0, locked = 0;
+    function base(n) { return String(n).replace(/\s+\d+$/, ""); } // строка
+    undoable(args.undoName, function () {
+      for (var j = 0; j < layers.length; j++) {
+        var fx = layers[j].property("ADBE Effect Parade");
+        if (!fx || fx.numProperties === 0) continue;
+        if (layers[j].locked) { locked++; continue; }
+        var kill = [], seen = {};
+        for (var k = 1; k <= fx.numProperties; k++) {
+          var e = fx.property(k), key = e.matchName + "|" + base(e.name);
+          if (args.mode === "all" || seen[key]) kill.push(k);
+          else seen[key] = true;
+        }
+        for (var q = kill.length - 1; q >= 0; q--) fx.property(kill[q]).remove();
+        if (kill.length) { removed += kill.length; touched++; }
+      }
+    });
+    return { ok: true, changed: removed, layers: touched, locked: locked };
+  };

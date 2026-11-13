@@ -3,7 +3,7 @@ import { precompose, sequence, labelByType, removeUnused } from "../tools/ae/ser
 import { motionBlur } from "../tools/ae/animate";
 import { glass } from "../tools/ae/glass";
 import { align, anchor, distribute, reverseKeys, splitText } from "../tools/ae/layout";
-import { cloneKeys, mergeShapes, quickEase, toShapes, unprecompose } from "../tools/ae/mtools";
+import { cloneKeys, dedupeEffects, mergeShapes, quickEase, toShapes, unprecompose } from "../tools/ae/mtools";
 import { ELEMENT_ITEMS, EFFECT_ITEMS, LAYER_ITEMS } from "./create";
 import { layersWord } from "../lib/format";
 import { act, slider, type Preset } from "./types";
@@ -127,6 +127,18 @@ export const SERVICE_PRESETS: Preset[] = [
     hint: () => `Слои встанут на свои места и во времени. ${undoKeys} — и всё вернётся`,
     applyLabel: "Распаковать",
     build: (v) => act(unprecompose, { scope: v.scope, recursive: v.recursive, removeLayer: v.removeLayer, removeComps: v.removeComps }),
+  },
+  {
+    id: "dedupeFx", title: "Убрать дубли эффектов", subtitle: "Deep Glow 2, CC Light Sweep 2…", group: "Слои",
+    controls: [
+      { type: "seg", key: "scope", label: "Где", value: "all", options: [{ value: "all", label: "Все слои композиции" }, { value: "selected", label: "Выделенные" }] },
+      { type: "seg", key: "mode", label: "Что", value: "copies", options: [{ value: "copies", label: "Только копии" }, { value: "all", label: "Все эффекты" }] },
+    ],
+    hint: (v) => v.mode === "all"
+      ? `С каждого слоя уйдут все эффекты. ${undoKeys} — и всё вернётся`
+      : `Остаётся первый эффект каждого типа, копии с номером («… 2») удаляются. ${undoKeys} — и всё вернётся`,
+    applyLabel: "Убрать",
+    build: (v) => act(dedupeEffects, { scope: v.scope, mode: v.mode }),
   },
   { id: "merge", title: "Слить шейпы", subtitle: "Несколько шейп-слоёв в один", group: "Слои", controls: [],
     hint: () => "Выделите шейп-слои: всё сольётся в верхний, остальные выключатся", build: () => act(mergeShapes, {}) },

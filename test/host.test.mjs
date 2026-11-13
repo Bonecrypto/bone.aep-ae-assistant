@@ -766,3 +766,25 @@ test("порядок слоёв: лесенкой по времени, звук 
   h.run("ae.orderLayers", { direction: "up", scope: "all", audio: "together" });
   assert.deepEqual(h.comp.list.slice(1).map((l) => l.name.slice(1)), ["3", "3", "2", "2", "1", "1"]);
 });
+
+test("дубли эффектов: копии с номером уходят, первый остаётся; блокированные не трогаются", () => {
+  const h = makeContext([]);
+  const mk = (name, fx, locked = false) => {
+    const l = h.comp.attach(new h.Layer({ name, locked }));
+    const p = l.property("ADBE Effect Parade");
+    for (const [m, n] of fx) { const e = p.addProperty(m); e.name = n; }
+    return l;
+  };
+  const a = mk("A", [["CC Light Sweep", "CC Light Sweep"], ["ADBE Glo2", "Glow"], ["CC Light Sweep", "CC Light Sweep 2"], ["ADBE Glo2", "Glow 2"], ["ADBE Tint", "Tint"]]);
+  const b = mk("B", [["ADBE Glo2", "Glow"], ["ADBE Glo2", "Glow 2"]], true);
+  const c = mk("C", [["ADBE Glo2", "Glow"], ["ADBE Glo2", "Свечение"]]);
+  const names = (l) => l.property("ADBE Effect Parade").children.map((e) => e.name);
+  const r = h.run("ae.dedupeEffects", { scope: "all", mode: "copies" });
+  assert.equal(r.ok, true); assert.equal(r.changed, 2); assert.equal(r.layers, 1); assert.equal(r.locked, 1);
+  assert.deepEqual(names(a), ["CC Light Sweep", "Glow", "Tint"]);
+  assert.deepEqual(names(b), ["Glow", "Glow 2"], "заблокированный слой не трогаем");
+  assert.deepEqual(names(c), ["Glow", "Свечение"], "переименованный вручную — не копия");
+  a.selected = false; b.selected = false; c.selected = true;
+  const r2 = h.run("ae.dedupeEffects", { scope: "selected", mode: "all" });
+  assert.equal(r2.changed, 2); assert.deepEqual(names(c), []); assert.equal(names(a).length, 3);
+});
