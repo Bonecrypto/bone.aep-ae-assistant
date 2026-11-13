@@ -36,6 +36,17 @@ export type Prefs = {
   sttKey: string;
   sttBaseUrl: string;
   sttModel: string;
+  projectTemplate: string[];
+  projectAutoFolders: boolean;
+  projectAutoOrganize: boolean;
+  projectMakeComp: boolean;
+  projectsDone: string[];
+  compPreset: string;
+  compFps: number;
+  compDuration: number;
+  compName: string;
+  orderDirection: "down" | "up";
+  orderAudio: "together" | "bottom" | "top";
 };
 
 const defaults: Prefs = {
@@ -71,6 +82,21 @@ const defaults: Prefs = {
   sttKey: "",
   sttBaseUrl: "",
   sttModel: "",
+  projectTemplate: [
+    "01 Comps", "01 Comps/Main", "01 Comps/Precomps", "02 Footage", "02 Footage/Video", "02 Footage/Photo",
+    "03 Audio", "03 Audio/Music", "03 Audio/SFX", "03 Audio/Voice", "04 Graphics", "04 Graphics/Logos", "04 Graphics/PNG", "04 Graphics/Vectors",
+    "05 Solids & Nulls", "06 Renders", "07 Archive",
+  ],
+  projectAutoFolders: false,
+  projectAutoOrganize: false,
+  projectMakeComp: true,
+  projectsDone: [],
+  compPreset: "reels",
+  compFps: 30,
+  compDuration: 30,
+  compName: "Main Edit v01",
+  orderDirection: "down",
+  orderAudio: "bottom",
 };
 
 const KEY = "aea.prefs.v1";

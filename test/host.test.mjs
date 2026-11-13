@@ -662,3 +662,79 @@ test("распаковка: Time Remap и эффекты — пропуск с �
   pre.timeRemapEnabled = false; pre.selected = false;
   assert.equal(h.run("ae.unprecompose", { scope: "selected" }).code, "NO_PRECOMP");
 });
+
+
+// ---------- старт проекта ----------
+const TEMPLATE = ["01 Comps", "01 Comps/Main", "01 Comps/Precomps", "02 Footage", "02 Footage/Video", "02 Footage/Photo", "03 Audio", "03 Audio/Music", "03 Audio/SFX", "03 Audio/Voice",
+  "04 Graphics", "04 Graphics/Logos", "04 Graphics/PNG", "04 Graphics/Vectors", "05 Solids & Nulls", "06 Renders", "07 Archive"];
+const DEST = { main: "01 Comps/Main", precomps: "01 Comps/Precomps", video: "02 Footage/Video", photo: "02 Footage/Photo", png: "04 Graphics/PNG", vectors: "04 Graphics/Vectors",
+  music: "03 Audio/Music", sfx: "03 Audio/SFX", voice: "03 Audio/Voice", logos: "04 Graphics/Logos", solids: "05 Solids & Nulls" };
+const pathOf = (it) => { const p = []; let f = it.parentFolder; while (f && f.name !== "root") { p.unshift(f.name); f = f.parentFolder; } return p.join("/"); };
+
+test("старт проекта: папки, главная композиция в Main; повторно — без дублей", () => {
+  const h = makeContext(null);
+  const args = { folders: TEMPLATE, dest: DEST, organize: true, comp: { name: "Main Edit v01", width: 1080, height: 1920, fps: 30, duration: 30 }, mainName: "Main Edit v01" };
+  const r = h.run("ae.projectStart", args);
+  assert.equal(r.ok, true, JSON.stringify(r)); assert.equal(r.folders, 17); assert.equal(r.compCreated, true);
+  const main = h.ctx.app.project.item(h.ctx.app.project.numItems);
+  const comp = [...Array(h.ctx.app.project.numItems)].map((_, i) => h.ctx.app.project.item(i + 1)).find((x) => x.name === "Main Edit v01");
+  assert.equal(pathOf(comp), "01 Comps/Main");
+  const n = h.ctx.app.project.numItems;
+  const r2 = h.run("ae.projectStart", args);
+  assert.equal(r2.folders, 0); assert.equal(r2.compCreated, false); assert.equal(h.ctx.app.project.numItems, n, "ничего не задвоилось");
+  assert.equal(h.undo.filter((x) => x.startsWith("begin")).length, 2, "по одной undo-группе на нажатие");
+  void main;
+});
+
+test("разложить: по типу и словам в имени; свои папки и вложенное не трогаем; папку Solids — в Solids & Nulls", () => {
+  const h = makeContext(null);
+  h.run("ae.projectStart", { folders: TEMPLATE, dest: DEST, organize: false, comp: null });
+  const items = {
+    clip: h.footage("drone_shot", "mp4"), photo: h.footage("IMG_2041", "jpg"), png: h.footage("arrow", "png"), logo: h.footage("Logo white", "png"),
+    ai: h.footage("icons", "ai"), music: h.footage("bg track", "mp3", { hasVideo: false, hasAudio: true, duration: 120 }),
+    whoosh: h.footage("whoosh 03", "wav", { hasVideo: false, hasAudio: true, duration: 1 }), vo: h.footage("VO take 2", "wav", { hasVideo: false, hasAudio: true, duration: 40 }),
+    long: h.footage("ambience", "wav", { hasVideo: false, hasAudio: true, duration: 90 }), short: h.footage("pop", "wav", { hasVideo: false, hasAudio: true, duration: 2 }),
+  };
+  const solid = new h.ctx.FootageItem("Black Solid 1"); solid.mainSource = new h.ctx.SolidSourceCls(); solid.parentFolder = h.root;
+  const solidsFolder = new h.FolderItem("Solids"); solidsFolder.parentFolder = h.root;
+  const mine = new h.FolderItem("Мои исходники"); mine.parentFolder = h.root;
+  const inside = h.footage("keep_me", "mp4"); inside.parentFolder = mine;
+  const pre = h.ctx.app.project.items.addComp("Title", 100, 100, 1, 5, 25);
+  const r = h.run("ae.organize", { dest: DEST, mainName: "Main Edit v01" });
+  assert.equal(r.ok, true);
+  const exp = { clip: "02 Footage/Video", photo: "02 Footage/Photo", png: "04 Graphics/PNG", logo: "04 Graphics/Logos", ai: "04 Graphics/Vectors",
+    music: "03 Audio/Music", whoosh: "03 Audio/SFX", vo: "03 Audio/Voice", long: "03 Audio/Music", short: "03 Audio/SFX" };
+  for (const [k, path] of Object.entries(exp)) assert.equal(pathOf(items[k]), path, k);
+  assert.equal(pathOf(solid), "05 Solids & Nulls"); assert.equal(pathOf(solidsFolder), "05 Solids & Nulls");
+  assert.equal(pathOf(pre), "01 Comps/Precomps");
+  assert.equal(pathOf(mine), "", "своя папка осталась в корне"); assert.equal(pathOf(inside), "Мои исходники");
+});
+
+test("безопасная зона Reels: направляющий, залоченный, наверху; повторно — заменяется; скрыть/удалить", () => {
+  const h = makeContext([]);
+  h.comp.width = 1080; h.comp.height = 1920;
+  h.comp.attach(new h.Layer({ name: "клип" }));
+  h.run("ae.safeZone", { kind: "reels", name: "PA Safe Reels" });
+  h.run("ae.safeZone", { kind: "reels", name: "PA Safe Reels" });
+  const zones = h.comp.list.filter((l) => l.name === "PA Safe Reels");
+  assert.equal(zones.length, 1); const z = zones[0];
+  assert.equal(z.guideLayer, true); assert.equal(z.locked, true); assert.equal(h.comp.layer(1), z);
+  const danger = z.property("ADBE Root Vectors Group").property(1).property("ADBE Vectors Group");
+  const rects = danger.children.filter((c) => c.matchName === "ADBE Vector Shape - Rect");
+  assert.equal(rects.length, 5);
+  assert.deepEqual(plain(rects[0].property("ADBE Vector Rect Size").value), [1080, 250]);
+  h.run("ae.safeZoneToggle", { action: "hide" }); assert.equal(z.enabled, false); assert.equal(z.locked, true);
+  h.run("ae.safeZoneToggle", { action: "delete" }); assert.equal(h.comp.list.some((l) => l.name.startsWith("PA Safe")), false);
+  assert.equal(h.run("ae.safeZoneToggle", { action: "show" }).code, "NO_SAFE_ZONES");
+});
+
+test("порядок слоёв: лесенкой по времени, звук отдельным блоком снизу, залоченный слой на месте", () => {
+  const h = makeContext([]);
+  const guide = h.comp.attach(new h.Layer({ name: "PA Safe Reels" })); guide.locked = true;
+  const mk = (name, t, audio) => { const l = h.comp.attach(new h.Layer({ name })); l.inPoint = t; if (audio) { l.hasAudio = true; l.hasVideo = false; } return l; };
+  mk("v3", 6); mk("a1", 0, true); mk("v1", 0); mk("v2", 3); mk("a3", 6, true); mk("a2", 3, true);
+  h.run("ae.orderLayers", { direction: "down", scope: "all", audio: "bottom" });
+  assert.deepEqual(h.comp.list.map((l) => l.name), ["PA Safe Reels", "v1", "v2", "v3", "a1", "a2", "a3"]);
+  h.run("ae.orderLayers", { direction: "up", scope: "all", audio: "together" });
+  assert.deepEqual(h.comp.list.slice(1).map((l) => l.name.slice(1)), ["3", "3", "2", "2", "1", "1"]);
+});

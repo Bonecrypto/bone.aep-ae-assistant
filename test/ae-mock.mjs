@@ -137,6 +137,8 @@ export function makeContext(activeItem) {
         add(source) { const l = new AVLayer({ name: source.name }); l.source = source; return comp.attach(l, true); },
       };
     }
+    get parentFolder() { return this._parent ?? null; }
+    set parentFolder(f) { if (this._parent) this._parent.list = this._parent.list.filter((x) => x !== this); this._parent = f; f.list.push(this); }
     get usedIn() { return this._usedIn ?? [...registry.values()].filter((c) => c.list && c.list.some((l) => l.source === this && !l.removed)); }
     set usedIn(v) { this._usedIn = v; }
     saveFrameToPng(t, f) { ctx.savedFrames = [...(ctx.savedFrames ?? []), { t, file: f.fsName }]; }
@@ -159,6 +161,7 @@ export function makeContext(activeItem) {
   Folder.selectDialog = () => new Folder("C:/Библиотека");
   class ImportOptions { constructor(f) { this.file = f; } canImportAs() { return /\.aep$/i.test(this.file.fsName); } }
   const root = new FolderItem("root");
+  const allItems = () => { const out = []; const walk = (f) => { for (const it of f.list) { out.push(it); if (it instanceof FolderItem) walk(it); } }; walk(root); return out; };
   function vectorsGroup(m) {
     return Object.assign(new Group(m, [], { addable: {
       "ADBE Vector Group": () => new Group("ADBE Vector Group", [vectorsGroup("ADBE Vectors Group"), new Group("ADBE Vector Transform Group", [
@@ -189,11 +192,12 @@ export function makeContext(activeItem) {
 
   const ctx = {
     CompItem, AVLayer, TextLayer, ShapeLayer, CameraLayer, LightLayer, SolidSource, KeyframeEase, Shape, MarkerValue,
-    FolderItem, FootageItem, File, Folder, ImportOptions, ImportAsType: { PROJECT: 1, FOOTAGE: 2 }, ParagraphJustification: { CENTER_JUSTIFY: 7413 }, BlendingMode: { NORMAL: 1, ADD: 2, SCREEN: 3 },
+    FolderItem, FootageItem, File, Folder, SolidSourceCls: SolidSource, ImportOptions, ImportAsType: { PROJECT: 1, FOOTAGE: 2 }, ParagraphJustification: { CENTER_JUSTIFY: 7413 }, BlendingMode: { NORMAL: 1, ADD: 2, SCREEN: 3 },
     PropertyValueType: PVT, PropertyType: PT,
     KeyframeInterpolationType: { LINEAR, BEZIER, HOLD: 6614 },
-    app: { version: "26.5x89", project: { activeItem: null, numItems: 3, removeUnusedFootage: () => 2, rootFolder: root,
-      items: { addFolder: (n) => { const f = new FolderItem(n); f.parentFolder = root; return f; }, addComp: (n, w, h) => { const c = new CompItem([]); c.name = n; c.width = w; c.height = h; return c; } },
+    app: { version: "26.5x89", project: { activeItem: null, file: null, revision: 1, removeUnusedFootage: () => 2, rootFolder: root,
+      get numItems() { return allItems().length; }, item: (i) => allItems()[i - 1],
+      items: { addFolder: (n) => { const f = new FolderItem(n); f.parentFolder = root; return f; }, addComp: (n, w, h, pa, dur, fr) => { const c = new CompItem([]); Object.assign(c, { name: n, width: w, height: h, duration: dur, frameRate: fr }); c.parentFolder = root; return c; } },
       itemByID: (id) => registry.get(id) ?? null,
       importFile: (io) => {
         ctx.imports = (ctx.imports ?? 0) + 1;
@@ -213,8 +217,9 @@ export function makeContext(activeItem) {
   new Function(...Object.keys(ctx), bundleHost())(...Object.values(ctx));
   const comp = activeItem === null ? null : new CompItem(activeItem ?? []);
   ctx.app.project.activeItem = comp;
+  const footage = (name, ext, extra = {}) => { const f = new FootageItem(name); Object.assign(f, { file: { name: `${name}.${ext}`, fsName: `C:/in/${name}.${ext}` }, hasVideo: true, hasAudio: false, duration: 5 }, extra); f.parentFolder = root; return f; };
   return {
-    ctx, comp, undo, makeText, Layer: AVLayer, files, root,
+    ctx, comp, undo, makeText, Layer: AVLayer, files, root, footage, FolderItem, SolidSource,
     run: (name, args) => JSON.parse(ctx.AEA.run(name, args)),
   };
 }

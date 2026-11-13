@@ -11,15 +11,18 @@ import { TABS_PRESETS } from "./presets/all";
 import { ChatSection } from "./sections/Chat";
 import { EaseSection } from "./sections/Ease";
 import { LibrarySection } from "./sections/Library";
+import { ProjectSection } from "./sections/Project";
+import { startProjectWatcher } from "./lib/project";
 import { libraryTransitions } from "./presets/transitions";
 import { useLibrary } from "./lib/library";
 import { SettingsSection } from "./sections/Settings";
 import { Browser } from "./ui/Browser";
 import { Palette } from "./ui/Palette";
 import { Dock } from "./ui/Dock";
-import { IconFolder, IconBraces, IconChat, IconCurve, IconGear, IconLayers, IconPlus, IconSearch, IconSparkles, IconText, IconWave, IconWrench } from "./ui/icons";
+import { IconProject, IconFolder, IconBraces, IconChat, IconCurve, IconGear, IconLayers, IconPlus, IconSearch, IconSparkles, IconText, IconWave, IconWrench } from "./ui/icons";
 
 const TABS = [
+  { id: "project", title: "Старт проекта", icon: IconProject },
   { id: "library", title: "Библиотека", icon: IconFolder },
   { id: "ease", title: "Скорость", icon: IconCurve },
   { id: "text", title: "Текст", icon: IconText },
@@ -46,10 +49,11 @@ export function App() {
     registerShortcuts();
     callHost("system.ping").then((r) => { if (!r.ok) setStatus({ kind: "error", text: "Скрипт панели не загрузился в AE. Переоткройте панель." }); });
     const stop = startSelectionPolling();
+    const stopProject = startProjectWatcher();
     if (inAE()) fetchReleases().then((l) => setUpdate(l.find(isNewer) ?? null)).catch(() => {});
     const onKey = (e: KeyboardEvent) => { if ((e.ctrlKey || e.metaKey) && e.code === "KeyK") { e.preventDefault(); setPalette((v) => !v); } };
     document.addEventListener("keydown", onKey);
-    return () => { stop(); document.removeEventListener("keydown", onKey); };
+    return () => { stop(); stopProject(); document.removeEventListener("keydown", onKey); };
   }, []);
 
   // сообщение о действии висит в строке состояния 6 секунд, потом снова видна композиция
@@ -109,6 +113,7 @@ export function App() {
         {tab === "settings" && <SettingsSection />}
         {current?.id === "ease" && <EaseSection />}
         {current?.id === "library" && <LibrarySection />}
+        {current?.id === "project" && <ProjectSection />}
         {current?.id === "chat" && <ChatSection onOpenSettings={() => goTo("settings")} />}
         {browser && <Browser key={current!.id} id={current!.id} title={browser.title} presets={browser.presets} />}
       </main>

@@ -64,6 +64,10 @@ function mockHost(name: string): Promise<HostResult> {
     "ae.create": { ok: true, layer: "Слой", parented: 0 },
     "ae.element": { ok: true, layer: "Элемент" },
     "ae.precompose": { ok: true, comp: "Прекомпоз", changed: 2 },
+    "ae.projectStart": { ok: true, folders: 17, comp: "Main Edit v01", compCreated: true, width: 1080, height: 1920, fps: 30, moved: 4, by: { video: 2, music: 1, png: 1 } },
+    "ae.organize": { ok: true, moved: 3, by: { video: 2, sfx: 1 } },
+    "ae.safeZone": { ok: true, layer: "PA Safe Reels" },
+    "ae.projectInfo": { ok: true, numItems: 5, file: null, revision: 40 },
     "ae.unprecompose": { ok: true, precomps: 3, layers: 7, removedComps: 3, remap: 0, stretch: 0, effects: 0 },
   };
   const r = fake[name] ?? { ok: true, changed: 2, skipped: { locked: 0, noPosition: 0, expression: 0 }, mock: true };
