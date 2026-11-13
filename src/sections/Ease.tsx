@@ -9,6 +9,7 @@ import { ALL_EASE_PRESETS, type Curve } from "../presets/ease";
 import type { Preset } from "../presets/types";
 import { ease, readEase, type Manual } from "../tools/ae/ease";
 import { CurveEditor } from "../ui/CurveEditor";
+import { MiniCurve } from "../ui/glyphs";
 import { Sidebar, useWide } from "../ui/Browser";
 import { Controls } from "../ui/Controls";
 import { Seg } from "../ui/ui";
@@ -47,7 +48,8 @@ export function EaseSection() {
   };
   const remove = () => { setPrefs({ customCurves: customCurves.filter((c) => c.id !== cur) }); pick(all[0].id); };
   const isCustom = customCurves.some((c) => c.id === cur);
-  const sidebar = <Sidebar title="Кривые" presets={list} current={cur} onPick={pick} favKey="ease" />;
+  const curveOf = (id: string) => all.find((x) => x.id === id)?.curve;
+  const sidebar = <Sidebar title="Кривые" presets={list} current={cur} onPick={pick} favKey="ease" iconFor={(p) => { const c = curveOf(p.id); return c ? <MiniCurve c={c} /> : null; }} />;
 
   return (
     <div className={`browser${wide ? "" : " narrow"}`}>

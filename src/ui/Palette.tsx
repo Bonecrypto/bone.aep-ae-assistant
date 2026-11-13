@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { matchScore, type Command } from "../commands";
 import { setPrefs, usePrefs } from "../lib/store";
 import { IconSearch, IconStar } from "./icons";
+import { MiniCurve, glyphFor } from "./glyphs";
+import { ALL_EASE_PRESETS } from "../presets/ease";
 
 /** Палитра команд (Ctrl+K): поиск по всем действиям, понимает неправильную раскладку. */
 export function Palette({ commands, onClose }: { commands: Command[]; onClose: () => void }) {
@@ -45,6 +47,12 @@ export function Palette({ commands, onClose }: { commands: Command[]; onClose: (
           {items.length === 0 && <div className="empty">Ничего не нашлось</div>}
           {items.map((c, i) => (
             <div key={c.id} className={`pal-item${i === sel ? " sel" : ""}`} onMouseEnter={() => setSel(i)} onClick={() => run(c)}>
+              <span className="pal-ico">{(() => {
+                const [tab, ...rest] = c.id.split("."), id = rest.join(".");
+                if (tab === "ease") { const e = ALL_EASE_PRESETS.find((x) => x.id === id); if (e) return <MiniCurve c={e.curve} />; }
+                const G = glyphFor(tab, id);
+                return G ? <G /> : null;
+              })()}</span>
               <span className="pal-title">{c.title}</span>
               <span className="pal-group">{c.group}</span>
               <button className={`pal-fav${favorites.includes(c.id) ? " on" : ""}`} title="В избранное — будет сверху"

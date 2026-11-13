@@ -5,12 +5,13 @@ import { useLibrary, type LibItem } from "../lib/library";
 import { getPrefs, setPrefs, usePrefs } from "../lib/store";
 import { frequent, recordUse } from "../lib/usage";
 import { TABS_PRESETS } from "../presets/all";
-import { ALL_EASE_PRESETS, type Curve } from "../presets/ease";
+import { ALL_EASE_PRESETS } from "../presets/ease";
 import { libraryTransitions } from "../presets/transitions";
 import { defaults, type Preset } from "../presets/types";
 import { ease } from "../tools/ae/ease";
 import { libImport } from "../tools/ae/library";
 import { applyPreset } from "./Browser";
+import { GLYPH, MiniCurve, glyphFor } from "./glyphs";
 import { MOD } from "../lib/platform";
 import { IconBraces, IconCurve, IconFolder, IconLayers, IconPlus, IconSparkles, IconStar, IconText, IconWave, IconWrench } from "./icons";
 
@@ -32,12 +33,10 @@ const abbr = (title: string) => {
   return (w.length > 1 ? w[0][0] + w[1][0] : (w[0] ?? "?").slice(0, 2)).replace(/^./, (c) => c.toUpperCase());
 };
 
-const MiniCurve = ({ c }: { c: Curve }) => {
-  const X = (x: number) => 4 + x * 22, Y = (y: number) => 24 - y * 18;
-  return <svg viewBox="0 0 30 30" width="26" height="26"><path d={`M${X(0)} ${Y(0)} C${X(c[0])} ${Y(c[1])} ${X(c[2])} ${Y(c[3])} ${X(1)} ${Y(1)}`} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" /></svg>;
-};
-
-const Glyph = ({ tab, title }: { tab: string; title: string }) => {
+// своя иконка функции; если её нет — значок вкладки и две буквы названия
+const Glyph = ({ tab, id, title }: { tab: string; id: string; title: string }) => {
+  const G = glyphFor(tab, id);
+  if (G) return <span className="dock-icon"><G /></span>;
   const Icon = TAB_ICON[tab] ?? IconStar;
   return <span className="dock-glyph"><Icon /><b>{abbr(title)}</b></span>;
 };
@@ -50,18 +49,18 @@ function resolve(key: string, libItems: LibItem[]): Entry | null {
   if (tab === "ease") {
     const c = [...ALL_EASE_PRESETS, ...getPrefs().customCurves].find((x) => x.id === id);
     if (!c) return null;
-    return { key, title: c.title, group: TAB_NAME.ease, glyph: <MiniCurve c={c.curve} />, run: () => { recordUse(key); runTool(ease, { curve: c.curve }); } };
+    return { key, title: c.title, group: TAB_NAME.ease, glyph: <span className="dock-icon"><MiniCurve c={c.curve} size={22} /></span>, run: () => { recordUse(key); runTool(ease, { curve: c.curve }); } };
   }
   if (tab === "lib") {
     const it = libItems.find((x) => x.path === id);
     if (!it) return null;
-    return { key, title: it.name, group: `Библиотека · ${it.category}`, glyph: <Glyph tab="library" title={it.name} />, run: () => { recordUse(key); runTool(libImport, { item: it }); } };
+    return { key, title: it.name, group: `Библиотека · ${it.category}`, glyph: (() => { const G = GLYPH[`lib:${it.kind}`]; return G ? <span className="dock-icon"><G /></span> : <Glyph tab="library" id="" title={it.name} />; })(), run: () => { recordUse(key); runTool(libImport, { item: it }); } };
   }
   const list: Preset[] = [...(TABS_PRESETS[tab]?.presets ?? []), ...(tab === "transitions" ? libraryTransitions(libItems) : [])];
   const p = list.find((x) => x.id === id);
   if (!p) return null;
   return {
-    key, title: p.title, group: TAB_NAME[tab] ?? tab, glyph: <Glyph tab={tab} title={p.title} />,
+    key, title: p.title, group: TAB_NAME[tab] ?? tab, glyph: <Glyph tab={tab} id={p.id} title={p.title} />,
     run: () => { const v = { ...defaults(p), ...(values() ?? {}) }; recordUse(key, v); applyPreset(p, v); },
   };
 }

@@ -9,6 +9,8 @@ import { defaults, type Preset, type Values } from "../presets/types";
 import { Controls } from "./Controls";
 import { Preview } from "./Preview";
 import { IconStar } from "./icons";
+import { glyphFor } from "./glyphs";
+import type { JSX } from "react";
 
 /** Ширина панели: на узкой список пресетов сворачивается в выпадающий. */
 export function useWide(min = 470) {
@@ -17,7 +19,7 @@ export function useWide(min = 470) {
   return w >= min;
 }
 
-export function Sidebar({ title, presets, current, onPick, favKey }: { title: string; presets: Preset[]; current: string; onPick: (id: string) => void; favKey: string }) {
+export function Sidebar({ title, presets, current, onPick, favKey, iconFor }: { title: string; presets: Preset[]; current: string; onPick: (id: string) => void; favKey: string; iconFor?: (p: Preset) => JSX.Element | null }) {
   const { favorites } = usePrefs();
   const fav = (id: string) => favorites.includes(`${favKey}:${id}`);
   const toggle = (id: string) => {
@@ -43,7 +45,7 @@ export function Sidebar({ title, presets, current, onPick, favKey }: { title: st
             {g.items.map((p) => (
               <div key={`${g.name}-${p.id}`} className={`sb-item${p.id === current ? " on" : ""}`} onClick={() => onPick(p.id)} role="button" tabIndex={0}
                 onKeyDown={(e) => e.key === "Enter" && onPick(p.id)}>
-                <span className="sb-dot" />
+                <span className="sb-ico">{(() => { if (iconFor) { const el = iconFor(p); if (el) return el; } const G = glyphFor(favKey, p.id); return G ? <G /> : <span className="sb-dot" />; })()}</span>
                 <span className="sb-text"><b>{p.title}</b><small>{p.subtitle}</small></span>
                 <button className={`sb-fav${fav(p.id) ? " on" : ""}`} title="В избранное" onClick={(e) => { e.stopPropagation(); toggle(p.id); }}><IconStar /></button>
               </div>

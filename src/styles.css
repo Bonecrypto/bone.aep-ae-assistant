@@ -363,3 +363,11 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 15p
 .chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
 .tips { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 5px; color: var(--muted); font-size: 11.5px; }
 .tips b { color: var(--text); font-weight: 600; }
+
+/* ---------- иконки функций ---------- */
+.sb-ico { width: 22px; height: 22px; flex: none; display: grid; place-items: center; color: var(--accent-text); }
+.sb-ico .sb-dot { width: 5px; height: 5px; }
+.sb-item.on .sb-ico { color: var(--on-accent); }
+.dock-icon { display: grid; place-items: center; width: 100%; height: 100%; }
+.dock-icon svg { width: 20px; height: 20px; }
+.pal-ico { width: 20px; flex: none; display: grid; place-items: center; color: var(--accent-text); }
