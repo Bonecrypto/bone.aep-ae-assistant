@@ -1,6 +1,6 @@
 {
   "name": "ae-assistant",
-  "version": "0.16.1",
+  "version": "0.17.0",
   "private": true,
   "type": "module",
   "description": "AE Assistant — CEP-панель для Adobe After Effects: ИИ-чат и быстрые действия",

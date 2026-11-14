@@ -38,7 +38,7 @@ function textMarker(a, mode, style, dur = a.marker.duration) {
 
 for (const style of ["tr", "marker"]) test(`текст (${style}): время — от маркера; каждая единица от 100% (спрятана) к 0%, для всех пресетов и порядков`, () => {
   setPrefs({ animControl: style });
-  for (const p of TABS_PRESETS.text.presets.filter((x) => x.build)) {
+  for (const p of TABS_PRESETS.text.presets.filter((x) => x.build && x.group === "Появление и исчезание")) {
     for (const order of ["forward", "reverse", "center", "random"]) {
       for (const mode of ["in", "out"]) {
         const v = { ...defaults(p), order, mode };
@@ -135,4 +135,28 @@ test("счётчики: выражение даёт правильный тек�
   assert.equal(run(c.money, { from: 0, to: 1234.5, decimals: 2, cur: "rub", ease: "linear", duration: 2 }, 3), "1\u00a0234,50\u00a0₽");
   assert.equal(run(c.timer, { from: 90, to: 0, ease: "linear", duration: 90 }, 1), "01:30");
   assert.equal(run(c.timer, { from: 3700, to: 0, ease: "linear", duration: 10 }, 0), "1:01:40");
+});
+
+test("вигл текста: у каждой буквы свой шум, сила 0 — стоит, кадры — рывками", () => {
+  const ws = TABS_PRESETS.text.presets.filter((x) => x.group === "Постоянное движение");
+  assert.ok(ws.length >= 8);
+  const perlin = (v) => Math.sin(v[0] * 1.3) * Math.cos(v[1] * 2.1) * 0.6;
+  for (const p of ws) {
+    const a = p.build(defaults(p)).input;
+    assert.equal(a.marker, undefined, `${p.id}: без маркера`);
+    const fx = sliders(a.controls);
+    const code = a.code.split("@@").join("1");
+    let poster = 0;
+    const amount = (time, i, over = {}) => evalExpr(code, { effect: (n) => () => { const f = { ...fx, ...over }; if (!(n in f)) throw new Error("нет " + n); return f[n]; }, time, textIndex: i, noise: perlin, posterizeTime: (f) => { poster = f; } });
+    const r1 = amount(0.7, 1), r2 = amount(0.7, 2);
+    assert.equal(r1.length, 3);
+    assert.ok(r1.every((x) => x >= -100 && x <= 100), `${p.id}: в пределах`);
+    assert.notDeepEqual(r1, r2, `${p.id}: буквы двигаются по-разному`);
+    assert.notDeepEqual(amount(0.7, 1), amount(1.3, 1), `${p.id}: меняется во времени`);
+    const still = amount(0.7, 1, { "Вигл1 · сила": 0 });
+    assert.ok(still.every((x) => Math.abs(x - (p.id === "wiggleFlicker" ? 50 : 0)) < 1e-9), `${p.id}: сила 0`);
+    if (fx["Вигл1 · кадров в секунду"] > 0) assert.equal(poster, fx["Вигл1 · кадров в секунду"]);
+    if (p.id === "wiggleFlicker") assert.ok(r1.every((x) => x >= 0), "мерцание только гасит");
+    if (p.id === "wigglePulse") assert.ok(r1[0] === r1[1] && r1[1] === r1[2], "масштаб равномерный");
+  }
 });

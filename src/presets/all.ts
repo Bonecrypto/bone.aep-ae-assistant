@@ -1,7 +1,7 @@
 import { CAROUSELS, SCENE_TRANSITIONS, TRANSITIONS } from "./transitions";
 import { COUNTERS } from "./counters";
 import { BEATS, MORPH, SUBTITLES } from "./media";
-import { TEXT_PRESETS, TEXT_STYLE_PRESETS } from "./text";
+import { TEXT_PRESETS, TEXT_STYLE_PRESETS, WIGGLE_PRESETS } from "./text";
 import { SHAKES } from "./shakes";
 import { STYLES } from "./styles";
 import { EXPRESSION_PRESETS } from "./expressions-browser";
@@ -10,7 +10,7 @@ import type { Preset } from "./types";
 
 /** Все вкладки-браузеры: id вкладки → заголовок списка и пресеты. */
 export const TABS_PRESETS: Record<string, { title: string; presets: Preset[] }> = {
-  text: { title: "Текст", presets: [...TEXT_PRESETS, ...TEXT_STYLE_PRESETS, SUBTITLES] },
+  text: { title: "Текст", presets: [...TEXT_PRESETS, ...WIGGLE_PRESETS, ...TEXT_STYLE_PRESETS, SUBTITLES] },
   transitions: { title: "Переходы", presets: [...TRANSITIONS, ...SCENE_TRANSITIONS, ...CAROUSELS, MORPH] },
   styles: { title: "Стили", presets: STYLES },
   shakes: { title: "Тряска", presets: SHAKES },

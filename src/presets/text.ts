@@ -132,6 +132,84 @@ export const TEXT_PRESETS: Preset[] = [
   make("tracking", "Разлёт трекинга", "Буквы съезжаются к центру", [slider("tracking", "Трекинг", 40, 0, 300, 1), blur(8)], (v) => ({ opacity: 0, tracking: v.tracking, blur: v.blur }), { order: "center", total: 1, soft: 60 }),
 ];
 
+/*
+ * Постоянное движение (вигл по буквам). Аниматор задаёт размах, Expression Selector для каждой
+ * единицы даёт плавный шум -100..100 по осям: буквы двигаются всё время, без маркера и ключей.
+ * Ползунки на слое: частота, сила (можно анимировать ключами), кадров в секунду (0 — плавно, 8–12 — «рисованное кипение»).
+ * shape: xyz — свой шум на каждую ось; uniform — один на все (масштаб); positive — только 0..100 (мерцание прозрачности).
+ */
+type WiggleShape = "xyz" | "uniform" | "positive";
+
+function wiggleCode(shape: WiggleShape) {
+  const out = shape === "uniform" ? "[x, x, x]" : shape === "positive" ? "[(x + 100) / 2, (x + 100) / 2, (x + 100) / 2]" : "[x, y, z]";
+  return `// AE Assistant — вигл текста: каждая единица движется по своему шуму
+var f = effect("Вигл@@ · частота")(1), s = effect("Вигл@@ · сила")(1) / 100, fps = effect("Вигл@@ · кадров в секунду")(1);
+if (fps > 0) posterizeTime(fps);
+var i = textIndex, t = time * f;
+function N(k) { return Math.max(-1, Math.min(1, 1.6 * noise([i * 7.31 + k, t]))); }
+var x = 100 * s * N(0.17), y = 100 * s * N(41.3), z = 100 * s * N(83.9);
+${out};`;
+}
+
+/** Плавный псевдошум для превью (в AE — noise()). */
+const pnoise = (seed: number, t: number) => (Math.sin(t * 2.1 + seed * 1.7) + Math.sin(t * 3.3 + seed * 4.1) * 0.6 + Math.sin(t * 5.7 + seed * 2.9) * 0.3) / 1.9;
+
+function wiggle(id: string, title: string, subtitle: string, extra: Ctl[], props: (v: Values) => Hidden, shape: WiggleShape, init: { freq?: number; strength?: number; fps?: number; unit?: string } = {}): Preset {
+  const controls: Ctl[] = [
+    { ...UNIT, value: init.unit ?? "chars" } as Ctl,
+    slider("freq", "Частота", init.freq ?? 2, 0.1, 20, 0.1, "раз/с"),
+    slider("strength", "Сила", init.strength ?? 100, 0, 100, 1, "%"),
+    slider("fps", "Кадров в секунду", init.fps ?? 0, 0, 30, 1),
+    ...extra,
+  ];
+  return {
+    id, title, subtitle, group: "Постоянное движение", controls,
+    code: () => wiggleCode(shape),
+    preview: (v) => {
+      const h = props(v);
+      return {
+        kind: "text", text: v.unit === "lines" ? "Живой\nтекст" : "Живой текст", unit: v.unit, length: 4,
+        pose: (i, _n, t0): Pose => {
+          const t = (v.fps > 0 ? Math.floor(t0 * v.fps) / v.fps : t0) * v.freq, k = v.strength / 100;
+          const ax = pnoise(i * 7.3, t) * k, ay = pnoise(i * 7.3 + 41, t) * k;
+          const a = shape === "positive" ? (ax + 1) / 2 : ax;
+          return {
+            o: 1 - a * (1 - (h.opacity ?? 100) / 100),
+            x: (h.position?.[0] ?? 0) * a * 0.5,
+            y: (h.position?.[1] ?? 0) * (shape === "uniform" ? ax : ay) * 0.5,
+            s: 1 + ((h.scale ?? 100) / 100 - 1) * a,
+            r: (h.rotation ?? 0) * a,
+            b: Math.max(0, (h.blur ?? 0) * a * 0.25),
+            sk: (h.skew ?? 0) * a,
+          };
+        },
+      };
+    },
+    hint: (_v, sel) => sel.text
+      ? `${sel.text} ${plural(sel.text, "текстовый слой", "текстовых слоя", "текстовых слоёв")} · движется всё время. Частота и сила — ползунки на слое, силу можно анимировать ключами`
+      : "Выделите текстовый слой",
+    build: (v) => act(textFx, {
+      title, unit: v.unit, props: props(v), code: wiggleCode(shape), startSlider: "",
+      controls: [{ name: "Вигл@@ · частота", value: v.freq }, { name: "Вигл@@ · сила", value: v.strength }, { name: "Вигл@@ · кадров в секунду", value: v.fps }],
+    }),
+  };
+}
+
+const amp = (v = 10) => slider("amp", "Размах", v, 0, 200, 1, "px");
+const tilt = (v = 10) => slider("tilt", "Наклон", v, 0, 90, 1, "°");
+
+export const WIGGLE_PRESETS: Preset[] = [
+  wiggle("wiggleMove", "Вигл букв", "Каждая буква плавает сама по себе", [amp(10)], (v) => ({ position: [v.amp, v.amp] }), "xyz"),
+  wiggle("wiggleAlive", "Живые буквы", "Плавают и покачиваются", [amp(6), tilt(8)], (v) => ({ position: [v.amp, v.amp], rotation: v.tilt }), "xyz", { freq: 1.5 }),
+  wiggle("wiggleRock", "Покачивание", "Буквы качаются вокруг своей оси", [tilt(12)], (v) => ({ rotation: v.tilt }), "xyz", { freq: 1.2 }),
+  wiggle("wigglePulse", "Пульсация", "Буквы дышат масштабом", [slider("pulse", "Масштаб", 25, 0, 150, 1, "%")], (v) => ({ scale: 100 + v.pulse }), "uniform", { freq: 1.5 }),
+  wiggle("wiggleBoil", "Кипение", "Рисованное дрожание, как в мультфильме", [amp(3), tilt(4)], (v) => ({ position: [v.amp, v.amp], rotation: v.tilt }), "xyz", { freq: 6, fps: 8 }),
+  wiggle("wiggleJitter", "Нервная тряска", "Мелко и часто", [amp(4)], (v) => ({ position: [v.amp, v.amp] }), "xyz", { freq: 14 }),
+  wiggle("wiggleFloat", "Плавающие слова", "Медленно, по словам", [amp(14)], (v) => ({ position: [v.amp * 0.4, v.amp] }), "xyz", { unit: "words", freq: 0.5 }),
+  wiggle("wiggleFlicker", "Мерцание", "Буквы то гаснут, то загораются", [slider("dim", "Гаснут до", 20, 0, 100, 1, "%")], (v) => ({ opacity: v.dim }), "positive", { freq: 4 }),
+  wiggle("wiggleGlitch", "Глитч", "Рывками со сдвигом и наклоном", [amp(25), slider("skew", "Наклон", 20, 0, 70, 1, "°")], (v) => ({ position: [v.amp, v.amp * 0.2], skew: v.skew }), "xyz", { freq: 3, fps: 10, strength: 80 }),
+];
+
 const styleSummary = () => {
   const s = getPrefs().textStyle;
   if (!s) return "Стиль ещё не скопирован";
