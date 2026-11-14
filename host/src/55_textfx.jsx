@@ -39,7 +39,7 @@
     if (!comp) return fail("NO_COMP");
     var texts = textLayers(selectedLayers(comp));
     if (!texts.length) return fail("NO_TEXT_LAYER");
-    var changed = 0, unitSet = true;
+    var changed = 0, unitSet = true, squeezed = 0;
 
     undoable(args.undoName, function () {
       for (var i = 0; i < texts.length; i++) {
@@ -69,7 +69,7 @@
         var sel = anim.property("ADBE Text Selectors").addProperty("ADBE Text Expressible Selector");
         if (!setBasedOn(sel, args.unit)) unitSet = args.unit === "chars";
         if (args.marker && args.marker.style === "tr") {
-          ensurePointMarker(layer, args.mode === "out" ? layer.outPoint - args.marker.duration : layer.inPoint + args.marker.duration, args.mode === "out" ? "TR Out" : "TR In");
+          if (placeTR(layer, args.mode !== "out", args.marker.duration)) squeezed++;
         } else if (args.marker) {
           var mt = comp.time;
           if (args.at === "layer") mt = args.mode === "out" ? layer.outPoint - args.marker.duration : layer.inPoint;
@@ -84,5 +84,5 @@
       }
     });
     if (!changed) return fail("NOTHING_CHANGED", { skipped: { locked: texts.length } });
-    return { ok: true, changed: changed, unitSet: unitSet };
+    return { ok: true, changed: changed, unitSet: unitSet, squeezed: squeezed };
   };

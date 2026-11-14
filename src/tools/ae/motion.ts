@@ -1,4 +1,5 @@
 import { layersWord } from "../../lib/format";
+import { squeezeNote } from "./squeeze";
 import { hostTool, undoHint } from "../host-tool";
 
 export type MotionInput = {
@@ -44,5 +45,5 @@ export const motion = hostTool<MotionInput>({
   },
   mutates: true,
   toArgs: (i) => ({ ...i, title: undefined, blurName: "Ассистент · размытие" }),
-  done: (r, i) => `${i.title ?? "Переход"}: ${layersWord(Number(r.changed))}.${undoHint}${Number(r.foreign) ? ` · не тронуто свойств с вашими выражениями: ${r.foreign}` : ""}`,
+  done: (r, i) => `${i.title ?? "Переход"}: ${layersWord(Number(r.changed))}.${undoHint}${Number(r.foreign) ? ` · не тронуто свойств с вашими выражениями: ${r.foreign}` : ""}${squeezeNote(r.squeezed)}`,
 });

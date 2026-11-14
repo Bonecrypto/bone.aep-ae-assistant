@@ -34,11 +34,38 @@
     return true;
   }
 
-  // Начало анимации (s) и длительность (d) в выражении — по стилю маркера.
+  function findMarker(layer, comment) {
+    var mp = layer.property("ADBE Marker");
+    for (var k = mp.numKeys; k >= 1; k--) if (mp.keyValue(k).comment === comment) return mp.keyTime(k);
+    return null;
+  }
+
+  // TR In / TR Out for a short layer: never let them cross. Returns true when the
+  // animation had to be squeezed (layer shorter than in + out).
+  function placeTR(layer, isIn, duration) {
+    // a marker set at the time of another one replaces it - keep them a frame apart
+    var t, other, fr = 1 / 25;
+    try { fr = layer.containingComp.frameDuration; } catch (e) {}
+    if (isIn) {
+      t = layer.inPoint + duration; other = findMarker(layer, "TR Out");
+      if (other !== null && t > other - fr) t = Math.max(layer.inPoint, other - fr);
+      if (t > layer.outPoint) t = layer.outPoint;
+    } else {
+      t = layer.outPoint - duration; other = findMarker(layer, "TR In");
+      if (other !== null && t < other + fr) t = Math.min(layer.outPoint, other + fr);
+      if (t < layer.inPoint) t = layer.inPoint;
+    }
+    ensurePointMarker(layer, t, isIn ? "TR In" : "TR Out");
+    var now = findMarker(layer, isIn ? "TR In" : "TR Out");
+    return now !== null && Math.abs((isIn ? now - layer.inPoint : layer.outPoint - now) - duration) > 0.0005;
+  }
+
+  // Start (s) and length (d) of the animation in the expression. TR Out never starts
+  // before TR In (and vice versa), even when the user drags the markers across.
   function trTiming(isIn) {
     return isIn
-      ? "var mk = MK(\"TR In\");\nif (!mk) return value;\nvar s = inPoint, d = Math.max(mk.time - inPoint, 0.001);\n"
-      : "var mk = MK(\"TR Out\");\nif (!mk) return value;\nvar s = mk.time, d = Math.max(outPoint - mk.time, 0.001);\n";
+      ? "var mk = MK(\"TR In\");\nif (!mk) return value;\nvar mo = MK(\"TR Out\"), e = mk.time;\nif (mo && mo.time < e) e = mo.time;\nvar s = inPoint, d = Math.max(e - inPoint, 0.001);\n"
+      : "var mk = MK(\"TR Out\");\nif (!mk) return value;\nvar mi = MK(\"TR In\"), s = mk.time;\nif (mi && mi.time > s) s = mi.time;\nvar d = Math.max(outPoint - s, 0.001);\n";
   }
 
   // Номер для новой анимации на слое: маркеры слоя + 1 (чтобы имена не совпадали).

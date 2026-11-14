@@ -32,7 +32,7 @@
   }
 
   // Режим маркера: те же «спрятанные» значения, но через выражения, от маркера слоя.
-  var foreign = { n: 0 };
+  var foreign = { n: 0, squeezed: 0 };
   function motionByMarker(layer, tr, comp, t0, duration, args, isIn) {
     var trStyle = args.markerStyle === "tr";
     var tag = nextTag(layer), name = String(args.markerName || "Anim @@").split("@@").join(tag);
@@ -64,7 +64,7 @@
       if (bp) add(bp, "return value + " + num(args.blurFrom) + " * Math.max(0, h);");
     }
     if (did) {
-      if (trStyle) ensurePointMarker(layer, isIn ? layer.inPoint + duration : layer.outPoint - duration, isIn ? "TR In" : "TR Out");
+      if (trStyle) { if (placeTR(layer, isIn, duration)) foreign.squeezed++; }
       else addLayerMarker(layer, t0, duration, name);
     }
     return did;
@@ -79,7 +79,7 @@
     var duration = args.duration > 0 ? args.duration : 0.6;
     var stagger = args.stagger > 0 ? args.stagger : 0;
     var changed = 0, skipped = { locked: 0, noPosition: 0, expression: 0 };
-    foreign.n = 0;
+    foreign.n = 0; foreign.squeezed = 0;
 
     undoable(args.undoName, function () {
       for (var i = 0; i < layers.length; i++) {
@@ -143,5 +143,5 @@
       }
     });
     if (!changed) return fail(foreign.n ? "FOREIGN_EXPRESSION" : "NOTHING_CHANGED", { skipped: skipped });
-    return { ok: true, changed: changed, skipped: skipped, foreign: foreign.n };
+    return { ok: true, changed: changed, skipped: skipped, foreign: foreign.n, squeezed: foreign.squeezed };
   };

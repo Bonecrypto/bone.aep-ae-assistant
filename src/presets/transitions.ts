@@ -58,9 +58,12 @@ export function markerHint(mode: string, multi = false) {
 }
 
 function make(id: string, title: string, subtitle: string, group: string, extra: Ctl[], recipe: Recipe, multi = false): Preset {
-  const controls = [DIR_SEG, AT_SEG, DUR, ...extra, ...(multi ? [STAG] : [])];
+  const all = [DIR_SEG, AT_SEG, DUR, ...extra, ...(multi ? [STAG] : [])];
+  const noAt = all.filter((c) => c.key !== "at");
   return {
-    id, title, subtitle, group, controls,
+    id, title, subtitle, group,
+    // в стиле TR In / TR Out (кроме каскада) время задают края слоя — «Где» не нужно
+    get controls() { return getPrefs().animControl === "tr" && !multi ? noAt : all; },
     preview: (v) => {
       const r = recipe(v);
       const count = multi ? 3 : 1;

@@ -838,3 +838,18 @@ test("мои анимации: пустой слой — понятная оши
   h.comp.attach(new h.Layer({ name: "X" }));
   assert.equal(h.run("ae.animCapture", {}).code, "NOTHING_TO_SAVE");
 });
+
+test("TR на коротком слое: TR Out не встаёт раньше TR In, исчезание доходит до конца", () => {
+  const { run, l, tr } = one();
+  l.inPoint = 0; l.outPoint = 2;
+  run("ae.motion", { mode: "in", duration: 1.3, fade: true, control: "marker", markerStyle: "tr", markerName: "П @@", hidden: "(1 - p)" });
+  const r = run("ae.motion", { mode: "out", duration: 1.3, fade: true, control: "marker", markerStyle: "tr", markerName: "И @@", hidden: "p" });
+  assert.equal(r.squeezed, 1);
+  const ms = l.property("ADBE Marker").keys;
+  assert.deepEqual(ms.map((k) => [Math.round(k.t * 100) / 100, k.v.comment]), [[1.3, "TR In"], [1.34, "TR Out"]], "кадр между маркерами — иначе AE заменит один другим");
+  const opac = (time) => evalExpr(tr.property("ADBE Opacity").expression, { time, value: 100, inPoint: 0, outPoint: 2, thisLayer: { marker: markersOf(l) } });
+  assert.equal(opac(0), 0); assert.equal(opac(1.32), 100, "полностью виден между анимациями"); assert.ok(opac(1.99) < 5, "к концу слоя исчез");
+  // пользователь перетащил TR Out левее TR In — исчезание всё равно начинается после появления
+  ms.find((k) => k.v.comment === "TR Out").t = 0.8;
+  assert.equal(opac(1.3), 100); assert.ok(opac(1.99) < 5);
+});

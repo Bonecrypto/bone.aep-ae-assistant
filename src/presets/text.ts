@@ -14,7 +14,7 @@ type Hidden = TextFxArgs["props"];
 
 const UNIT: Ctl = { type: "seg", key: "unit", label: "По", value: "chars", options: [{ value: "chars", label: "буквам" }, { value: "words", label: "словам" }, { value: "lines", label: "строкам" }] };
 const EASE: Ctl = { type: "seg", key: "ease", label: "Кривая", value: "smooth", options: [{ value: "smooth", label: "Плавно" }, { value: "expo", label: "Резко" }, { value: "back", label: "Пружина" }, { value: "elastic", label: "Резинка" }] };
-const ORDER: Ctl = { type: "seg", key: "order", label: "Порядок", value: "forward", options: [{ value: "forward", label: "→" }, { value: "reverse", label: "←" }, { value: "center", label: "↔" }, { value: "random", label: "?" }] };
+const ORDER: Ctl = { type: "seg", key: "order", label: "Порядок", value: "forward", options: [{ value: "forward", label: "С начала →" }, { value: "reverse", label: "С конца ←" }, { value: "center", label: "От центра" }, { value: "random", label: "Вразнобой" }] };
 const TOTAL = slider("total", "Длительность", 1, 0.1, 6, 0.05, "с");
 const SOFT = slider("soft", "Плавность", 40, 0, 100, 1, "%");
 const ORDER_EXPR: Record<string, string> = {
@@ -37,8 +37,8 @@ function amountCode(v: Values, markerName: string, style: "tr" | "bar" = "bar") 
 ${MK}
 ${style === "tr"
     ? (v.mode === "out"
-      ? `var mk = MK("TR Out");\nif (!mk) { [0, 0, 0]; } else {\n  var S0 = mk.time, T = Math.max(outPoint - mk.time, 0.001);`
-      : `var mk = MK("TR In");\nif (!mk) { [0, 0, 0]; } else {\n  var S0 = inPoint, T = Math.max(mk.time - inPoint, 0.001);`)
+      ? `var mk = MK("TR Out");\nif (!mk) { [0, 0, 0]; } else {\n  var mi = MK("TR In"), S0 = mk.time;\n  if (mi && mi.time > S0) S0 = mi.time;\n  var T = Math.max(outPoint - S0, 0.001);`
+      : `var mk = MK("TR In");\nif (!mk) { [0, 0, 0]; } else {\n  var mo = MK("TR Out"), E = mk.time;\n  if (mo && mo.time < E) E = mo.time;\n  var S0 = inPoint, T = Math.max(E - inPoint, 0.001);`)
     : `var mk = MK(${JSON.stringify(markerName)});\nif (!mk) { [0, 0, 0]; } else {\n  var S0 = mk.time, T = Math.max(mk.duration, 0.001);`}
   var F = Math.min(1, Math.max(0, effect("Текст@@ · плавность")(1) / 100));
   var n = textTotal, i = textIndex - 1;
@@ -70,9 +70,12 @@ const textStyle = (): "tr" | "bar" => (getPrefs().animControl === "marker" ? "ba
 const markerFor = (title: string, mode: string, tag: string) => `${mode === "out" ? "Исчезание" : "Появление"} · ${title} ${tag}`;
 
 function make(id: string, title: string, subtitle: string, extra: Ctl[], hidden: (v: Values) => Hidden, init: Partial<Record<string, any>> = {}): Preset {
-  const controls = [DIR_SEG, AT_SEG, UNIT, EASE, TOTAL, SOFT, ...extra, ORDER].map((c) => (c.key in init ? { ...c, value: init[c.key] } : c)) as Ctl[];
+  const all = [DIR_SEG, AT_SEG, UNIT, ORDER, EASE, TOTAL, SOFT, ...extra].map((c) => (c.key in init ? { ...c, value: init[c.key] } : c)) as Ctl[];
+  const noAt = all.filter((c) => c.key !== "at");
   return {
-    id, title, subtitle, group: "Появление и исчезание", controls,
+    id, title, subtitle, group: "Появление и исчезание",
+    // в стиле TR In / TR Out время задают края слоя — «Где» не нужно
+    get controls() { return textStyle() === "tr" ? noAt : all; },
     code: (v) => amountCode(v, markerFor(title, v.mode, "@@"), textStyle()),
     preview: (v) => {
       const h = hidden(v);

@@ -1,4 +1,5 @@
 import { layersWord } from "../../lib/format";
+import { squeezeNote } from "./squeeze";
 import { hostTool, undoHint } from "../host-tool";
 
 export type TextFxArgs = {
@@ -21,5 +22,5 @@ export const textFx = hostTool<TextFxArgs>({
   inputSchema: { type: "object", properties: {} },
   mutates: true,
   toArgs: (i) => ({ unit: i.unit, props: i.props, code: i.code, controls: i.controls, startSlider: i.startSlider, animatorName: i.title, marker: i.marker, at: i.at, mode: i.mode }),
-  done: (r, i) => `${i.title}: ${layersWord(Number(r.changed))}${r.unitSet === false ? " (не удалось переключить на слова/строки — анимация по буквам)" : ""}.${undoHint}`,
+  done: (r, i) => `${i.title}: ${layersWord(Number(r.changed))}${r.unitSet === false ? " (не удалось переключить на слова/строки — анимация по буквам)" : ""}.${undoHint}${squeezeNote(r.squeezed)}`,
 });

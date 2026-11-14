@@ -160,3 +160,18 @@ test("вигл текста: у каждой буквы свой шум, сил�
     if (p.id === "wigglePulse") assert.ok(r1[0] === r1[1] && r1[1] === r1[2], "масштаб равномерный");
   }
 });
+
+test("текст TR: перетащили TR Out левее TR In — исчезание начинается после появления", () => {
+  setPrefs({ animControl: "tr" });
+  const p = TABS_PRESETS.text.presets.find((x) => x.id === "drop");
+  assert.ok(!p.controls.some((c) => c.key === "at"), "в стиле TR нет «Где»");
+  const v = { ...defaults(p), mode: "out", soft: 100 };
+  const a = p.build(v).input, fx = sliders(a.controls), code = a.code.split("@@").join("1");
+  const marks = [{ comment: "TR In", time: 1.3, duration: 0 }, { comment: "TR Out", time: 0.8, duration: 0 }];
+  const amt = (time) => evalExpr(code, { effect: (n) => () => fx[n], time, inPoint: 0, outPoint: 2, textIndex: 1, textTotal: 3, thisLayer: layerWith(marks) })[0];
+  assert.ok(Math.abs(amt(1.3)) < 1e-6, "до TR In исчезание не началось");
+  assert.ok(Math.abs(amt(2) - 100) < 1e-6, "к концу слоя спрятан");
+  setPrefs({ animControl: "marker" });
+  assert.ok(p.controls.some((c) => c.key === "at"));
+  setPrefs({ animControl: "tr" });
+});
