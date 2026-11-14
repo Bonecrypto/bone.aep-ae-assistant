@@ -66,6 +66,7 @@ function mockHost(name: string): Promise<HostResult> {
     "ae.precompose": { ok: true, comp: "Прекомпоз", changed: 2 },
     "ae.projectStart": { ok: true, folders: 17, comp: "Main Edit v01", compCreated: true, width: 1080, height: 1920, fps: 30, moved: 4, by: { video: 2, music: 1, png: 1 } },
     "ae.organize": { ok: true, moved: 3, by: { video: 2, sfx: 1 } },
+    "ae.animCapture": { ok: true, anim: { v: 1, from: "Заголовок", text: true, groups: [], markers: [{ c: "TR In", d: 0, edge: "in", t: 0.8 }], stats: { props: 4, keys: 6, effects: 2, animators: 1, markers: 1 } } },
     "ae.safeZone": { ok: true, layer: "PA Safe Reels" },
     "ae.projectInfo": { ok: true, numItems: 5, file: null, revision: 40 },
     "ae.unprecompose": { ok: true, precomps: 3, layers: 7, removedComps: 3, remap: 0, stretch: 0, effects: 0 },

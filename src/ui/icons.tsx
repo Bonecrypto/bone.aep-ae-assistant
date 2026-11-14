@@ -20,3 +20,4 @@ export const IconLayers = I(<><rect x="3" y="7" width="12" height="12" rx="3" />
 export const IconWave = I(<path d="M2 12h3l2-6 4 12 3-9 2 3h6" />);
 export const IconFolder = I(<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />);
 export const IconProject = I(<><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><path d="M12 10v6M9 13h6" /></>);
+export const IconBookmark = I(<><path d="M6 4h12v16l-6-4-6 4z" /><path d="M12 8v5M9.5 10.5h5" /></>);

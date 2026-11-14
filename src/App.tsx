@@ -16,15 +16,17 @@ import { startProjectWatcher } from "./lib/project";
 import { libraryTransitions } from "./presets/transitions";
 import { useLibrary } from "./lib/library";
 import { SettingsSection } from "./sections/Settings";
+import { MyAnimsSection } from "./sections/MyAnims";
 import { Browser } from "./ui/Browser";
 import { Palette } from "./ui/Palette";
 import { Dock } from "./ui/Dock";
-import { IconProject, IconFolder, IconBraces, IconChat, IconCurve, IconGear, IconLayers, IconPlus, IconSearch, IconSparkles, IconText, IconWave, IconWrench } from "./ui/icons";
+import { IconProject, IconFolder, IconBookmark, IconBraces, IconChat, IconCurve, IconGear, IconLayers, IconPlus, IconSearch, IconSparkles, IconText, IconWave, IconWrench } from "./ui/icons";
 
 const TABS = [
   { id: "project", title: "Старт проекта", icon: IconProject },
   { id: "library", title: "Библиотека", icon: IconFolder },
   { id: "ease", title: "Скорость", icon: IconCurve },
+  { id: "myanims", title: "Мои анимации", icon: IconBookmark },
   { id: "text", title: "Текст", icon: IconText },
   { id: "transitions", title: "Переходы", icon: IconLayers },
   { id: "styles", title: "Стили", icon: IconSparkles },
@@ -114,6 +116,7 @@ export function App() {
         {current?.id === "ease" && <EaseSection />}
         {current?.id === "library" && <LibrarySection />}
         {current?.id === "project" && <ProjectSection />}
+        {current?.id === "myanims" && <MyAnimsSection />}
         {current?.id === "chat" && <ChatSection onOpenSettings={() => goTo("settings")} />}
         {browser && <Browser key={current!.id} id={current!.id} title={browser.title} presets={browser.presets} />}
       </main>

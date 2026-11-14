@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { makeContext, plain, PVT, KeyframeEase } from "./ae-mock.mjs";
+import { makeContext, plain, PVT, KeyframeEase, MarkerValue } from "./ae-mock.mjs";
 const h1 = { KE: KeyframeEase };
 
 // Мини-движок выражений AE для проверки сгенерированного кода.
@@ -787,4 +787,54 @@ test("дубли эффектов: копии с номером уходят, п
   a.selected = false; b.selected = false; c.selected = true;
   const r2 = h.run("ae.dedupeEffects", { scope: "selected", mode: "all" });
   assert.equal(r2.changed, 2); assert.deepEqual(names(c), []); assert.equal(names(a).length, 3);
+});
+
+test("мои анимации: снять со слоя и наложить на другие — ключи от начала слоя, позиция смещением, эффекты, текст, TR In", () => {
+  const h = makeContext([]);
+  const src = h.comp.attach(h.makeText("Источник", { text: "ab" }));
+  src.inPoint = 2;
+  const tr = src.property("ADBE Transform Group");
+  tr.property("ADBE Position").setValueAtTime(2, [100, 500]); tr.property("ADBE Position").setValueAtTime(3, [300, 500]);
+  tr.property("ADBE Opacity").expression = "wiggle(1, 5)"; tr.property("ADBE Opacity").expressionEnabled = true;
+  const glow = src.property("ADBE Effect Parade").addProperty("ADBE Glo2"); glow.name = "Свечение"; glow.property(1).value = 42;
+  const anim = src.property("ADBE Text Properties").property("ADBE Text Animators").addProperty("ADBE Text Animator");
+  anim.property("ADBE Text Animator Properties").addProperty("ADBE Text Opacity").value = 0;
+  const se = anim.property("ADBE Text Selectors").addProperty("ADBE Text Expressible Selector");
+  se.property("ADBE Text Expressible Amount").expression = 'MK("TR In")';
+  src.property("ADBE Marker").setValueAtTime(2.6, new MarkerValue("TR In"));
+  h.comp.list.forEach((l) => { l.selected = l === src; });
+  const cap = h.run("ae.animCapture", {});
+  assert.equal(cap.ok, true);
+  assert.equal(cap.anim.stats.keys, 2); assert.equal(cap.anim.stats.effects, 1); assert.equal(cap.anim.stats.animators, 1);
+  const anim2 = JSON.parse(JSON.stringify(cap.anim)); // как через localStorage
+
+  const a = h.comp.attach(h.makeText("A", { text: "xyz" })); a.inPoint = 5;
+  a.property("ADBE Transform Group").property("ADBE Position").value = [900, 200];
+  const b = h.comp.attach(new h.Layer({ name: "B" })); b.inPoint = 1;
+  h.comp.list.forEach((l) => { l.selected = l === a || l === b; });
+  const r = h.run("ae.animApply", { anim: anim2, at: "layer", relative: true });
+  assert.equal(r.ok, true); assert.equal(r.changed, 2); assert.equal(r.notText, 1); assert.equal(r.fails, 0);
+  const pa = a.property("ADBE Transform Group").property("ADBE Position");
+  assert.deepEqual(pa.keys.map((k) => [k.t, k.v]), [[5, [900, 200]], [6, [1100, 200]]], "от начала слоя и от его места");
+  assert.equal(a.property("ADBE Transform Group").property("ADBE Opacity").expression, "wiggle(1, 5)");
+  const g = a.property("ADBE Effect Parade").property(1);
+  assert.equal(g.name, "Свечение"); assert.equal(g.property(1).value, 42);
+  const an = a.property("ADBE Text Properties").property("ADBE Text Animators").property(1);
+  assert.equal(an.property("ADBE Text Animator Properties").property(1).value, 0);
+  assert.equal(an.property("ADBE Text Selectors").property(1).property("ADBE Text Expressible Amount").expression, 'MK("TR In")');
+  assert.deepEqual(a.property("ADBE Marker").keys.map((k) => [k.t, k.v.comment]), [[5.6, "TR In"]]);
+  assert.equal(b.property("ADBE Transform Group").property("ADBE Position").keys[0].t, 1, "не текст — трансформация и эффекты всё равно");
+  assert.equal(b.property("ADBE Effect Parade").numProperties, 1);
+  assert.equal(a.property("ADBE Text Properties").property("ADBE Text Document").value.text, "xyz", "текст не тронут");
+
+  h.comp.time = 4;
+  const c = h.comp.attach(new h.Layer({ name: "C" })); h.comp.list.forEach((l) => { l.selected = l === c; });
+  h.run("ae.animApply", { anim: anim2, at: "playhead", relative: false });
+  assert.deepEqual(c.property("ADBE Transform Group").property("ADBE Position").keys.map((k) => [k.t, k.v]), [[4, [100, 500]], [5, [300, 500]]]);
+});
+
+test("мои анимации: пустой слой — понятная ошибка", () => {
+  const h = makeContext([]);
+  h.comp.attach(new h.Layer({ name: "X" }));
+  assert.equal(h.run("ae.animCapture", {}).code, "NOTHING_TO_SAVE");
 });
