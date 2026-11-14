@@ -18,6 +18,7 @@ export type MotionInput = {
   hidden?: string;
   at?: "playhead" | "layer";
   markerStyle?: "tr" | "bar";
+  trOutSlider?: string;
 };
 
 export const motion = hostTool<MotionInput>({

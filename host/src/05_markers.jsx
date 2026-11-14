@@ -42,6 +42,13 @@
 
   // TR In / TR Out for a short layer: never let them cross. Returns true when the
   // animation had to be squeezed (layer shorter than in + out).
+  // Shared slider "TR Out duration": created once per layer, set to the latest applied value.
+  function trOutControl(layer, name, duration) {
+    if (!name) return;
+    var c = ensureControl(layer, { type: "slider", name: name, value: duration });
+    try { if (c && c.property(1).numKeys === 0) c.property(1).setValue(duration); } catch (e) {}
+  }
+
   function placeTR(layer, isIn, duration) {
     // a marker set at the time of another one replaces it - keep them a frame apart
     var t, other, fr = 1 / 25;
@@ -62,10 +69,13 @@
 
   // Start (s) and length (d) of the animation in the expression. TR Out never starts
   // before TR In (and vice versa), even when the user drags the markers across.
-  function trTiming(isIn) {
+  // outSlider: name of the "TR Out duration" slider - the out animation starts at TR Out
+  // and lasts that long (not up to the layer end), so dragging TR Out moves it.
+  function trTiming(isIn, outSlider) {
+    var lim = outSlider ? "try { var D = effect(" + str(outSlider) + ")(1); if (D > 0 && D < d) d = D; } catch (err) {}\n" : "";
     return isIn
       ? "var mk = MK(\"TR In\");\nif (!mk) return value;\nvar mo = MK(\"TR Out\"), e = mk.time;\nif (mo && mo.time < e) e = mo.time;\nvar s = inPoint, d = Math.max(e - inPoint, 0.001);\n"
-      : "var mk = MK(\"TR Out\");\nif (!mk) return value;\nvar mi = MK(\"TR In\"), s = mk.time;\nif (mi && mi.time > s) s = mi.time;\nvar d = Math.max(outPoint - s, 0.001);\n";
+      : "var mk = MK(\"TR Out\");\nif (!mk) return value;\nvar mi = MK(\"TR In\"), s = mk.time;\nif (mi && mi.time > s) s = mi.time;\nvar d = outPoint - s;\n" + lim + "d = Math.max(d, 0.001);\n";
   }
 
   // Номер для новой анимации на слое: маркеры слоя + 1 (чтобы имена не совпадали).

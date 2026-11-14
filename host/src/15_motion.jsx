@@ -36,7 +36,7 @@
   function motionByMarker(layer, tr, comp, t0, duration, args, isIn) {
     var trStyle = args.markerStyle === "tr";
     var tag = nextTag(layer), name = String(args.markerName || "Anim @@").split("@@").join(tag);
-    var timing = trStyle ? trTiming(isIn)
+    var timing = trStyle ? trTiming(isIn, args.trOutSlider)
       : "var mk = MK(" + str(name) + ");\nif (!mk) return value;\nvar s = mk.time, d = Math.max(mk.duration, 0.001);\n";
     var head = timing + "var p = Math.min(1, Math.max(0, (time - s) / d));\n" + "var h = " + args.hidden + ";\n";
     var did = false;
@@ -64,7 +64,7 @@
       if (bp) add(bp, "return value + " + num(args.blurFrom) + " * Math.max(0, h);");
     }
     if (did) {
-      if (trStyle) { if (placeTR(layer, isIn, duration)) foreign.squeezed++; }
+      if (trStyle) { if (placeTR(layer, isIn, duration)) foreign.squeezed++; if (!isIn) trOutControl(layer, args.trOutSlider, duration); }
       else addLayerMarker(layer, t0, duration, name);
     }
     return did;

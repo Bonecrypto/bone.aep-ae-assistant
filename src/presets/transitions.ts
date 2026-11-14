@@ -38,6 +38,9 @@ function poseFor(r: ReturnType<Recipe>, v: Values, i: number, t: number): Pose {
 }
 
 /** Режим маркера: насколько слой «спрятан» (h) от прогресса p внутри маркера — та же кривая, что в превью. */
+/** Общий ползунок длительности исчезания на слое (стиль TR). */
+export const TR_OUT_SLIDER = "TR Out · длительность";
+
 export function markerArgs(title: string, mode: string, spring: boolean, multi = false) {
   const style = getPrefs().animControl;
   if (style === "keys") return { control: "keys" as const };
@@ -46,14 +49,14 @@ export function markerArgs(title: string, mode: string, spring: boolean, multi =
     : `(1 - ${EASE_EXPR[spring ? "back" : "smooth"]})`;
   // каскад по слоям — всегда полосой: у каждого слоя свой сдвиг во времени
   const markerStyle = style === "tr" && !multi ? ("tr" as const) : ("bar" as const);
-  return { control: "marker" as const, markerStyle, markerName: `${mode === "out" ? "Исчезание" : "Появление"} · ${title} @@`, hidden };
+  return { control: "marker" as const, markerStyle, trOutSlider: markerStyle === "tr" && mode === "out" ? TR_OUT_SLIDER : undefined, markerName: `${mode === "out" ? "Исчезание" : "Появление"} · ${title} @@`, hidden };
 }
 
 /** Подсказка, где искать ручку длительности. */
 export function markerHint(mode: string, multi = false) {
   const style = getPrefs().animControl;
   if (style === "keys") return "ключами от текущего времени";
-  if (style === "tr" && !multi) return mode === "out" ? "от маркера «TR Out» до конца слоя — двигайте маркер" : "от начала слоя до маркера «TR In» — двигайте маркер";
+  if (style === "tr" && !multi) return mode === "out" ? "начинается на маркере «TR Out» — двигайте его; длительность — ползунок «TR Out · длительность» на слое" : "от начала слоя до маркера «TR In» — двигайте маркер";
   return "длительность — маркер-полоса на слое, тяните его конец";
 }
 

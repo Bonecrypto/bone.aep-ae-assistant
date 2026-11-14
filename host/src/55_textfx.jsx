@@ -70,6 +70,7 @@
         if (!setBasedOn(sel, args.unit)) unitSet = args.unit === "chars";
         if (args.marker && args.marker.style === "tr") {
           if (placeTR(layer, args.mode !== "out", args.marker.duration)) squeezed++;
+          if (args.mode === "out") trOutControl(layer, args.marker.outSlider, args.marker.duration);
         } else if (args.marker) {
           var mt = comp.time;
           if (args.at === "layer") mt = args.mode === "out" ? layer.outPoint - args.marker.duration : layer.inPoint;

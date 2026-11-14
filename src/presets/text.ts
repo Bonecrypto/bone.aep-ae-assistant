@@ -3,6 +3,7 @@ import { EASE_EXPR, easeOut, type EaseKind } from "../lib/easing";
 import { plural } from "../lib/format";
 import { setPrefs, getPrefs, setStatus } from "../lib/store";
 import { textFx, type TextFxArgs } from "../tools/ae/textfx";
+import { TR_OUT_SLIDER } from "./transitions";
 import { textCopyStyle, textPasteStyle } from "../tools/ae/text";
 import { act, AT_SEG, DIR_SEG, slider, type Ctl, type Pose, type Preset, type Values } from "./types";
 
@@ -37,7 +38,7 @@ function amountCode(v: Values, markerName: string, style: "tr" | "bar" = "bar") 
 ${MK}
 ${style === "tr"
     ? (v.mode === "out"
-      ? `var mk = MK("TR Out");\nif (!mk) { [0, 0, 0]; } else {\n  var mi = MK("TR In"), S0 = mk.time;\n  if (mi && mi.time > S0) S0 = mi.time;\n  var T = Math.max(outPoint - S0, 0.001);`
+      ? `var mk = MK("TR Out");\nif (!mk) { [0, 0, 0]; } else {\n  var mi = MK("TR In"), S0 = mk.time;\n  if (mi && mi.time > S0) S0 = mi.time;\n  var T = outPoint - S0;\n  try { var TD = effect(${JSON.stringify(TR_OUT_SLIDER)})(1); if (TD > 0 && TD < T) T = TD; } catch (err) {}\n  T = Math.max(T, 0.001);`
       : `var mk = MK("TR In");\nif (!mk) { [0, 0, 0]; } else {\n  var mo = MK("TR Out"), E = mk.time;\n  if (mo && mo.time < E) E = mo.time;\n  var S0 = inPoint, T = Math.max(E - inPoint, 0.001);`)
     : `var mk = MK(${JSON.stringify(markerName)});\nif (!mk) { [0, 0, 0]; } else {\n  var S0 = mk.time, T = Math.max(mk.duration, 0.001);`}
   var F = Math.min(1, Math.max(0, effect("Текст@@ · плавность")(1) / 100));
@@ -100,14 +101,14 @@ function make(id: string, title: string, subtitle: string, extra: Ctl[], hidden:
         },
       };
     },
-    hint: (v, sel) => sel.text ? `${sel.text} ${plural(sel.text, "текстовый слой", "текстовых слоя", "текстовых слоёв")} · ${textStyle() === "tr" ? (v.mode === "out" ? "от «TR Out» до конца слоя" : "от начала слоя до «TR In»") : "длительность — маркер-полоса на слое"}` : "Выделите текстовый слой",
+    hint: (v, sel) => sel.text ? `${sel.text} ${plural(sel.text, "текстовый слой", "текстовых слоя", "текстовых слоёв")} · ${textStyle() === "tr" ? (v.mode === "out" ? "начинается на «TR Out» — двигайте его; длительность — ползунок «TR Out · длительность»" : "от начала слоя до «TR In»") : "длительность — маркер-полоса на слое"}` : "Выделите текстовый слой",
     build: (v) => {
       const name = markerFor(title, v.mode, "@@");
       const style = textStyle();
       return act(textFx, {
         title, unit: v.unit, props: hidden(v), code: amountCode(v, name, style), startSlider: "",
         controls: [{ name: "Текст@@ · плавность", value: v.soft }],
-        marker: { name, duration: v.total, style }, at: v.at, mode: v.mode,
+        marker: { name, duration: v.total, style, outSlider: style === "tr" && v.mode === "out" ? TR_OUT_SLIDER : undefined }, at: v.at, mode: v.mode,
       });
     },
   };

@@ -853,3 +853,23 @@ test("TR на коротком слое: TR Out не встаёт раньше T
   ms.find((k) => k.v.comment === "TR Out").t = 0.8;
   assert.equal(opac(1.3), 100); assert.ok(opac(1.99) < 5);
 });
+
+test("TR Out: исчезание начинается на маркере и длится «TR Out · длительность»; маркер двигается — исчезание переезжает", () => {
+  const { run, l, tr } = one();
+  l.inPoint = 0; l.outPoint = 10;
+  run("ae.motion", { mode: "out", duration: 1, fade: true, control: "marker", markerStyle: "tr", trOutSlider: "TR Out · длительность", markerName: "И @@", hidden: "p" });
+  const slider = l.property("ADBE Effect Parade").property(1);
+  assert.equal(slider.name, "TR Out · длительность"); assert.equal(slider.property(1).value, 1);
+  const mk = l.property("ADBE Marker").keys.find((k) => k.v.comment === "TR Out");
+  assert.equal(mk.t, 9);
+  const fx = (n) => { if (n !== "TR Out · длительность") throw new Error("нет " + n); return () => slider.property(1).value; };
+  const opac = (time) => evalExpr(tr.property("ADBE Opacity").expression, { time, value: 100, inPoint: 0, outPoint: 10, effect: fx, thisLayer: { marker: markersOf(l) } });
+  assert.equal(opac(8.9), 100); assert.equal(opac(9.5), 50); assert.equal(opac(10), 0);
+  mk.t = 4; // утащили TR Out влево — исчезание за 1 с с 4-й секунды, дальше слой спрятан
+  assert.equal(opac(3.9), 100); assert.equal(opac(4.5), 50); assert.equal(opac(5), 0); assert.equal(opac(7), 0);
+  slider.property(1).value = 2; // длительность — ползунком
+  assert.equal(opac(5), 50);
+  // второе исчезание на том же слое — тот же ползунок, не второй
+  run("ae.motion", { mode: "out", duration: 1.5, scaleFrom: 0, control: "marker", markerStyle: "tr", trOutSlider: "TR Out · длительность", markerName: "И @@", hidden: "p" });
+  assert.equal(l.property("ADBE Effect Parade").numProperties, 1); assert.equal(slider.property(1).value, 1.5);
+});
